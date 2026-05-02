@@ -91,8 +91,8 @@ try
     loading = false;
     spinner.Wait();
 
-    Console.Write("\r" + new string(' ', 60)); // clear spinner
-    Console.WriteLine(); // move to new line
+    Console.Write("\r" + new string(' ', 60)); 
+    Console.WriteLine(); 
 
     Console.WriteLine($"Found Amount column: {amountColumn}");
     Console.WriteLine($"Found Week Ending column: {weekEndingColumn}");
@@ -100,7 +100,7 @@ try
     Console.WriteLine($"Found Line Total column: {lineTotalColumn}");
     Console.WriteLine($"Found Aggregate column: {aggregateColumn}");
 
-    // First pass: calculate totals and remember the LAST row for each Contractor + Week Ending
+    // First pass: calculate totals up to last row for each Contractor + Week Ending
     var totalsByContractorAndWeek = new Dictionary<string, decimal>();
     var lastRowByContractorAndWeek = new Dictionary<string, int>();
 
@@ -122,7 +122,7 @@ try
         lastRowByContractorAndWeek[key] = row;
     }
 
-    // Second pass: write aggregate total ONLY to the last row for each group
+    // Second pass: write aggregate total to the last row for each contractor
     foreach (var item in totalsByContractorAndWeek)
     {
         string key = item.Key;
@@ -133,13 +133,11 @@ try
 
         cell.Value = aggregateTotal;
 
-        // Copy base style first
         cell.Style = worksheet.Cell(targetRow, lineTotalColumn).Style;
 
-        // Apply accounting format to ALL values
         cell.Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
 
-        // If negative → make red
+        // Are credits applied? If so, make negative totals red so MSP can identify
         if (aggregateTotal < 0)
         {
             cell.Style.Font.FontColor = XLColor.Red;
