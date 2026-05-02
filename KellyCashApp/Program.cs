@@ -56,8 +56,9 @@ try
     int weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
     int contractorColumn = FindColumn(worksheet, headerRow, "Name");
     int lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
+    int locationDescriptionColumn = FindColumn(worksheet, headerRow, "Location Description");
 
-    if (weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1)
+    if (weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1 || locationDescriptionColumn == -1)
     {
         Console.WriteLine("Could not find Week Ending Date, Name, or Line Total.");
         return;
@@ -150,8 +151,19 @@ try
         "Downloads"
     );
 
-    string fileNameWithoutExt = Path.GetFileNameWithoutExtension(inputPath);
-    string outputPath = Path.Combine(downloadsPath, $"{fileNameWithoutExt}_Updated.xlsx");
+    string companyName = worksheet.Cell(headerRow + 1, locationDescriptionColumn).GetString().Trim();
+
+    if (string.IsNullOrWhiteSpace(companyName))
+    {
+        companyName = "Remittance Payment";
+    }
+
+    companyName = MakeSafeFileName(companyName);
+
+    decimal totalAmount = GetDecimalValue(worksheet.Cell(lastRow, lineTotalColumn));
+    string formattedTotal = totalAmount.ToString("N2", CultureInfo.InvariantCulture);
+
+    string outputPath = GetUniqueOutputPath(downloadsPath, $"{companyName} - {formattedTotal}.xlsx");
 
     workbook.SaveAs(outputPath);
 
@@ -256,4 +268,31 @@ static decimal GetDecimalValue(IXLCell cell)
         return result;
 
     return 0;
+}
+
+static string MakeSafeFileName(string fileName)
+{
+    foreach (char invalidChar in Path.GetInvalidFileNameChars())
+    {
+        fileName = fileName.Replace(invalidChar, '_');
+    }
+
+    return fileName.Trim();
+}
+
+static string GetUniqueOutputPath(string folderPath, string fileName)
+{
+    string fileNameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+    string extension = Path.GetExtension(fileName);
+
+    string outputPath = Path.Combine(folderPath, fileName);
+    int counter = 1;
+
+    while (File.Exists(outputPath))
+    {
+        outputPath = Path.Combine(folderPath, $"{fileNameWithoutExt} ({counter}){extension}");
+        counter++;
+    }
+
+    return outputPath;
 }
