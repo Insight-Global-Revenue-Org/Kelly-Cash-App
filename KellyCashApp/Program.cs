@@ -32,6 +32,20 @@ if (string.IsNullOrWhiteSpace(inputPath) || !File.Exists(inputPath))
     return;
 }
 
+bool loading = true;
+
+Task spinner = Task.Run(() =>
+{
+    char[] frames = { '/', '-', '\\', '|' };
+    int i = 0;
+
+    while (loading)
+    {
+        Console.Write($"\rProcessing payment file... {frames[i++ % frames.Length]}");
+        Thread.Sleep(120);
+    }
+});
+
 try
 {
     using var workbook = new XLWorkbook(inputPath);
@@ -71,12 +85,13 @@ try
         return;
     }
 
-    Console.WriteLine($"Found Amount column: {amountColumn}");
-    Console.WriteLine($"Found Week Ending column: {weekEndingColumn}");
-    Console.WriteLine($"Found Contractor Name column: {contractorColumn}");
-    Console.WriteLine($"Found Line Total column: {lineTotalColumn}");
+    int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? headerRow;
 
-    int lastRow = 100;
+    loading = false;
+    spinner.Wait();
+
+    Console.Write("\r" + new string(' ', 60)); // clear spinner
+    Console.WriteLine(); // move to new line
 
     Console.WriteLine($"Found Amount column: {amountColumn}");
     Console.WriteLine($"Found Week Ending column: {weekEndingColumn}");
@@ -140,6 +155,8 @@ try
 
     workbook.SaveAs(outputPath);
 
+
+
     Console.WriteLine();
     Console.WriteLine("Week-Ending Line Totals Calculated Per Invoice Line Item");
     Console.WriteLine("Done!");
@@ -147,6 +164,10 @@ try
 }
 catch (Exception ex)
 {
+    loading = false;
+    spinner.Wait();
+    Console.WriteLine();
+
     Console.WriteLine("Something went wrong:");
     Console.WriteLine(ex.Message);
 }
@@ -191,8 +212,8 @@ static void NormalizeColumns(IXLWorksheet worksheet, int headerRow, int contract
 
 static void InsertBlankColumn(IXLWorksheet worksheet, int targetColumn, string headerName, int headerRow)
 {
-    int lastRow = 100;
-    int lastColumn = 80;
+    int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? headerRow;
+    int lastColumn = worksheet.LastColumnUsed()?.ColumnNumber() ?? targetColumn;
 
     for (int row = 1; row <= lastRow; row++)
     {
