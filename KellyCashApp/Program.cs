@@ -39,12 +39,29 @@ try
 
     int headerRow = 13;
 
-    int amountColumn = FindColumn(worksheet, headerRow, "Amount");
     int weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
     int contractorColumn = FindColumn(worksheet, headerRow, "Name");
     int lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
 
-    if (amountColumn == -1 || weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1)
+    if (weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1)
+    {
+        Console.WriteLine("Could not find Week Ending Date, Name, or Line Total.");
+        return;
+    }
+
+    NormalizeColumns(worksheet, headerRow, contractorColumn);
+
+    // Re-find columns after normalization
+    int invoiceColumn = FindColumnAfter(worksheet, headerRow, "Invoice", contractorColumn);
+    int amountColumn = FindColumnAfter(worksheet, headerRow, "Amount", contractorColumn);
+    int aggregateColumn = FindColumn(worksheet, headerRow, "Aggregate Line Total");
+    int notesColumn = FindColumn(worksheet, headerRow, "Notes");
+
+    weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
+    contractorColumn = FindColumn(worksheet, headerRow, "Name");
+    lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
+
+    if (amountColumn == -1 || aggregateColumn == -1 || weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1)
     {
         Console.WriteLine("Could not find one or more required columns.");
         Console.WriteLine($"Amount: {amountColumn}");
@@ -59,31 +76,13 @@ try
     Console.WriteLine($"Found Contractor Name column: {contractorColumn}");
     Console.WriteLine($"Found Line Total column: {lineTotalColumn}");
 
-    int aggregateColumn = amountColumn + 1;
-    int lastRow = 23;
-    int lastColumn = 21;
+    int lastRow = 100;
 
-    // Shift columns after Amount one column to the right
-    for (int row = 1; row <= lastRow; row++)
-    {
-        for (int col = lastColumn; col >= aggregateColumn; col--)
-        {
-            worksheet.Cell(row, col + 1).CopyFrom(worksheet.Cell(row, col));
-            worksheet.Cell(row, col).Clear();
-        }
-    }
-
-    // After shifting, Line Total moved one column to the right
-    if (lineTotalColumn >= aggregateColumn)
-        lineTotalColumn++;
-
-    worksheet.Cell(headerRow, aggregateColumn).Value = "Aggregate Line Total";
-    worksheet.Cell(headerRow, aggregateColumn).Style =
-        worksheet.Cell(headerRow, amountColumn).Style;
-
-    // Extend row 12 design
-    worksheet.Cell(headerRow - 1, aggregateColumn).Style =
-        worksheet.Cell(headerRow - 1, amountColumn).Style;
+    Console.WriteLine($"Found Amount column: {amountColumn}");
+    Console.WriteLine($"Found Week Ending column: {weekEndingColumn}");
+    Console.WriteLine($"Found Contractor Name column: {contractorColumn}");
+    Console.WriteLine($"Found Line Total column: {lineTotalColumn}");
+    Console.WriteLine($"Found Aggregate column: {aggregateColumn}");
 
     // First pass: calculate totals and remember the LAST row for each Contractor + Week Ending
     var totalsByContractorAndWeek = new Dictionary<string, decimal>();
@@ -155,6 +154,66 @@ catch (Exception ex)
 static int FindColumn(IXLWorksheet worksheet, int headerRow, string headerName)
 {
     for (int col = 1; col <= 100; col++)
+    {
+        string headerText = worksheet.Cell(headerRow, col).Value.ToString().Trim();
+
+        if (headerText.Equals(headerName, StringComparison.OrdinalIgnoreCase))
+            return col;
+    }
+
+    return -1;
+}
+
+static void NormalizeColumns(IXLWorksheet worksheet, int headerRow, int contractorColumn)
+{
+    string[] desiredColumns =
+    {
+        "Invoice",
+        "Amount",
+        "Aggregate Line Total",
+        "Notes"
+    };
+
+    int insertAt = contractorColumn + 1;
+
+    foreach (string columnName in desiredColumns)
+    {
+        string currentHeader = worksheet.Cell(headerRow, insertAt).Value.ToString().Trim();
+
+        if (!currentHeader.Equals(columnName, StringComparison.OrdinalIgnoreCase))
+        {
+            InsertBlankColumn(worksheet, insertAt, columnName, headerRow);
+        }
+
+        insertAt++;
+    }
+}
+
+static void InsertBlankColumn(IXLWorksheet worksheet, int targetColumn, string headerName, int headerRow)
+{
+    int lastRow = 100;
+    int lastColumn = 80;
+
+    for (int row = 1; row <= lastRow; row++)
+    {
+        for (int col = lastColumn; col >= targetColumn; col--)
+        {
+            worksheet.Cell(row, col + 1).CopyFrom(worksheet.Cell(row, col));
+            worksheet.Cell(row, col).Clear();
+        }
+    }
+
+    worksheet.Cell(headerRow, targetColumn).Value = headerName;
+    worksheet.Cell(headerRow, targetColumn).Style =
+        worksheet.Cell(headerRow, targetColumn - 1).Style;
+
+    worksheet.Cell(headerRow - 1, targetColumn).Style =
+        worksheet.Cell(headerRow - 1, targetColumn - 1).Style;
+}
+
+static int FindColumnAfter(IXLWorksheet worksheet, int headerRow, string headerName, int afterColumn)
+{
+    for (int col = afterColumn + 1; col <= 100; col++)
     {
         string headerText = worksheet.Cell(headerRow, col).Value.ToString().Trim();
 
