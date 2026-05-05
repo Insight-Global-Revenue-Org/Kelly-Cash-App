@@ -21,7 +21,7 @@ Console.ResetColor();
 Thread.Sleep(100);
 
 Console.WriteLine("A Week-Ending Line Total Aggregate Script\n");
-Console.WriteLine("--------------------------------------------------\n");
+Console.WriteLine("──────────────────────────────────────────────────\n");
 
 Console.WriteLine("Paste the full file path of the Remittance Payment:");
 string? inputPath = Console.ReadLine()?.Trim().Trim('"');
@@ -65,6 +65,7 @@ try
     }
 
     NormalizeColumns(worksheet, headerRow, contractorColumn);
+    InsertBlankColumn(worksheet, contractorColumn + 1, "Name_", headerRow);
 
     // Re-find columns after normalization
     int invoiceColumn = FindColumnAfter(worksheet, headerRow, "Invoice", contractorColumn);
@@ -74,7 +75,17 @@ try
 
     weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
     contractorColumn = FindColumn(worksheet, headerRow, "Name");
+    int nameFormattedColumn = FindColumnAfter(worksheet, headerRow, "Name_", contractorColumn);
     lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
+
+    // Add Concat column after Line Total
+    InsertBlankColumn(worksheet, lineTotalColumn + 1, "Concat", headerRow);
+
+    // Re-find Line Total after inserting Concat
+    lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
+
+    // Find the new Concat column
+    int concatColumn = FindColumnAfter(worksheet, headerRow, "Concat", lineTotalColumn);
 
     if (amountColumn == -1 || aggregateColumn == -1 || weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1)
     {
@@ -87,6 +98,20 @@ try
     }
 
     int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? headerRow;
+
+    for (int row = headerRow + 1; row <= lastRow; row++)
+    {
+        string rawName = worksheet.Cell(row, contractorColumn).GetString().Trim();
+
+        if (string.IsNullOrWhiteSpace(rawName))
+            continue;
+
+        string formattedName = FormatName(rawName);
+        string formattedWeekEnding = FormatWeekEndingDate(worksheet.Cell(row, weekEndingColumn));
+
+        worksheet.Cell(row, nameFormattedColumn).Value = formattedName;
+        worksheet.Cell(row, concatColumn).Value = $"{formattedName} {formattedWeekEnding}";
+    }
 
     loading = false;
     spinner.Wait();
@@ -163,6 +188,15 @@ try
 
     string outputPath = GetUniqueOutputPath(downloadsPath, $"{companyName} - {formattedTotal}.xlsx");
 
+    int lastColumn = worksheet.LastColumnUsed()?.ColumnNumber() ?? lineTotalColumn;
+
+    if (worksheet.AutoFilter.IsEnabled)
+    {
+        worksheet.AutoFilter.Clear();
+    }
+
+    worksheet.Range(headerRow, 1, lastRow, lastColumn).SetAutoFilter();
+
     workbook.SaveAs(outputPath);
 
 
@@ -238,8 +272,14 @@ static void InsertBlankColumn(IXLWorksheet worksheet, int targetColumn, string h
     worksheet.Cell(headerRow, targetColumn).Style =
         worksheet.Cell(headerRow, targetColumn - 1).Style;
 
-    worksheet.Cell(headerRow - 1, targetColumn).Style =
-        worksheet.Cell(headerRow - 1, targetColumn - 1).Style;
+    var designCell = worksheet.Cell(headerRow - 1, targetColumn);
+    var leftCell = worksheet.Cell(headerRow - 1, targetColumn - 1);
+
+    // Copy style first
+    designCell.Style = leftCell.Style;
+
+    // Remove the shared border from the LEFT column
+    leftCell.Style.Border.RightBorder = XLBorderStyleValues.None;
 }
 
 static int FindColumnAfter(IXLWorksheet worksheet, int headerRow, string headerName, int afterColumn)
@@ -293,4 +333,42 @@ static string GetUniqueOutputPath(string folderPath, string fileName)
     }
 
     return outputPath;
+}
+
+static string FormatName(string input)
+{
+    // Expected: "DOE, JOHN"
+    if (!input.Contains(","))
+        return input;
+
+    var parts = input.Split(',');
+
+    if (parts.Length < 2)
+        return input;
+
+    string last = parts[0].Trim().ToLower();
+    string first = parts[1].Trim().ToLower();
+
+    // Capitalize first letters
+    last = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(last);
+    first = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(first);
+
+    return $"{first} {last}";
+}
+
+static string FormatWeekEndingDate(IXLCell cell)
+{
+    if (cell.Value.IsDateTime)
+    {
+        return cell.GetDateTime().ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+    }
+
+    string rawValue = cell.GetString().Trim();
+
+    if (DateTime.TryParse(rawValue, out DateTime parsedDate))
+    {
+        return parsedDate.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+    }
+
+    return rawValue;
 }
