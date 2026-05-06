@@ -20,35 +20,113 @@ Console.ResetColor();
 
 Thread.Sleep(100);
 
-Console.WriteLine("A Week-Ending Line Total Aggregate Script\n");
-Console.WriteLine("──────────────────────────────────────────────────\n");
+Console.WriteLine("A Week-Ending Line Total Aggregate Script");
+Console.WriteLine("──────────────────────────────────────────────────");
+var openInvoiceMatches = new Dictionary<string, OirMatch>();
 
-Console.WriteLine("Paste the full file path of the Remittance Payment:");
-string? inputPath = Console.ReadLine()?.Trim().Trim('"');
+string? inputPath = null;
+int defaultMenuOption = 0;
+int fixedMenuTop = Console.CursorTop;
 
-if (string.IsNullOrWhiteSpace(inputPath) || !File.Exists(inputPath))
+while (true)
 {
-    Console.WriteLine("File not found. Please check the path and try again.");
-    return;
-}
-
-bool loading = true;
-
-Task spinner = Task.Run(() =>
-{
-    char[] frames = { '/', '-', '\\', '|' };
-    int i = 0;
-
-    while (loading)
+    int selected = ShowMenu(new[]
     {
-        Console.Write($"\rProcessing payment file... {frames[i++ % frames.Length]}");
-        Thread.Sleep(120);
-    }
-});
+        "Import Open Invoice Report",
+        "Process Remittance Payment",
+        "Exit"
+    }, defaultMenuOption, fixedMenuTop);
 
-try
+    if (selected == 2)
+        return;
+
+    // ✅ declare ONCE here (fixes your error)
+    int promptTop = fixedMenuTop + 6;
+
+    if (selected == 0)
+    {
+        string? oirPath = PromptForFilePath(
+            "Paste the full file path of the Open Invoice Report:",
+            promptTop
+        );
+
+        if (string.IsNullOrWhiteSpace(oirPath) || !File.Exists(oirPath))
+        {
+            ClearArea(promptTop, 4);
+            Console.SetCursorPosition(0, promptTop);
+            Console.WriteLine("File not found. Please check the path and try again.\n");
+            continue;
+        }
+
+        bool oirLoading = true;
+
+        Task oirSpinner = Task.Run(() =>
+        {
+            char[] frames = { '/', '-', '\\', '|' };
+            int i = 0;
+
+            while (oirLoading)
+            {
+                Console.SetCursorPosition(0, promptTop);
+                Console.Write($"Importing Open Invoice Report... {frames[i++ % frames.Length]}   ");
+                Thread.Sleep(120);
+            }
+        });
+
+        try
+        {
+            openInvoiceMatches = LoadOpenInvoiceReport(oirPath);
+        }
+        finally
+        {
+            oirLoading = false;
+            oirSpinner.Wait();
+
+            ClearArea(promptTop, 4);
+        }
+
+        ClearArea(promptTop, 4);
+        Console.SetCursorPosition(0, promptTop);
+        Console.WriteLine($"Imported {openInvoiceMatches.Count} OIR matches into memory.\n");
+        Console.WriteLine("Press 'Enter' to process your payment");
+
+        Thread.Sleep(1000); // wait 1 second
+        defaultMenuOption = 1;
+        continue;
+    }
+
+    inputPath = PromptForFilePath(
+        "Paste the full file path of the Remittance Payment:",
+        promptTop
+    );
+
+    if (string.IsNullOrWhiteSpace(inputPath) || !File.Exists(inputPath))
+    {
+        ClearArea(promptTop, 4);
+        Console.SetCursorPosition(0, promptTop);
+        Console.WriteLine("File not found. Please check the path and try again.\n");
+        continue;
+    }
+
+    bool loading = true;
+
+    Task spinner = Task.Run(() =>
+    {
+        char[] frames = { '/', '-', '\\', '|' };
+        int i = 0;
+
+        while (loading)
+        {
+            Console.SetCursorPosition(0, promptTop);
+            Console.Write($"Processing payment file... {frames[i++ % frames.Length]}   ");
+            Thread.Sleep(120);
+        }
+    });
+
+    try
 {
-    using var workbook = new XLWorkbook(inputPath);
+    using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+    using var workbook = new XLWorkbook(stream);
     var worksheet = workbook.Worksheet("Payment Details");
 
     int headerRow = 13;
@@ -109,8 +187,12 @@ try
         string formattedName = FormatName(rawName);
         string formattedWeekEnding = FormatWeekEndingDate(worksheet.Cell(row, weekEndingColumn));
 
+        string concatValue = $"{formattedName} {formattedWeekEnding}".Trim();
+
         worksheet.Cell(row, nameFormattedColumn).Value = formattedName;
-        worksheet.Cell(row, concatColumn).Value = $"{formattedName} {formattedWeekEnding}";
+        worksheet.Cell(row, concatColumn).Value = concatValue;
+
+     
     }
 
     loading = false;
@@ -167,6 +249,19 @@ try
         {
             cell.Style.Font.FontColor = XLColor.Red;
         }
+
+        string concatValue = worksheet.Cell(targetRow, concatColumn).GetString().Trim();
+
+        if (openInvoiceMatches.TryGetValue(concatValue, out OirMatch match))
+        {
+            worksheet.Cell(targetRow, invoiceColumn).Value = match.DocumentNumber;
+            worksheet.Cell(targetRow, amountColumn).Value = match.RemainingAmount;
+
+            worksheet.Cell(targetRow, amountColumn).Style =
+                worksheet.Cell(targetRow, lineTotalColumn).Style;
+
+            worksheet.Cell(targetRow, amountColumn).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
+        }
     }
 
     string downloadsPath = Path.Combine(
@@ -197,25 +292,38 @@ try
 
     worksheet.Range(headerRow, 1, lastRow, lastColumn).SetAutoFilter();
 
+    worksheet.Column(invoiceColumn).Width = 16;
+    worksheet.Column(amountColumn).Width = 14;
+    worksheet.Column(aggregateColumn).Width = 20;
+    worksheet.Column(notesColumn).Width = 24;
+    worksheet.Column(nameFormattedColumn).Width = 18;
+    worksheet.Column(concatColumn).Width = 28;
+
     workbook.SaveAs(outputPath);
 
 
 
     Console.WriteLine();
     Console.WriteLine("Week-Ending Line Totals Calculated Per Invoice Line Item");
-    Console.WriteLine("Done!");
+    Console.WriteLine("All available open invoices have been automatically matched!");
+    Console.WriteLine("\nPress 'Enter' to process another payment.");
     Console.WriteLine($"Updated file saved to: {outputPath}");
-}
-catch (Exception ex)
-{
-    loading = false;
-    spinner.Wait();
-    Console.WriteLine();
 
-    Console.WriteLine("Something went wrong:");
-    Console.WriteLine(ex.Message);
-}
+        Thread.Sleep(1000); // wait 1 second
+        defaultMenuOption = 1;
+        continue;
+    }
+    catch (Exception ex)
+    {
+        loading = false;
+        spinner.Wait();
+        Console.WriteLine();
 
+        Console.WriteLine("Something went wrong:");
+        Console.WriteLine(ex.Message);
+    }
+
+}
 static int FindColumn(IXLWorksheet worksheet, int headerRow, string headerName)
 {
     for (int col = 1; col <= 100; col++)
@@ -372,3 +480,183 @@ static string FormatWeekEndingDate(IXLCell cell)
 
     return rawValue;
 }
+
+static int ShowMenu(string[] options, int defaultSelected, int menuTop)
+{
+    int selected = defaultSelected;
+    int menuWidth = options.Max(o => o.Length) + 4;
+
+    int neededRows = options.Length + 2;
+
+    if (menuTop + neededRows >= Console.BufferHeight)
+    {
+        menuTop = Math.Max(0, Console.BufferHeight - neededRows);
+    }
+
+    Console.CursorVisible = false;
+
+    DrawFullMenu(options, selected, menuTop, menuWidth);
+
+    while (true)
+    {
+        ConsoleKey key = Console.ReadKey(true).Key;
+
+        if (key == ConsoleKey.Enter)
+            break;
+
+        int oldSelected = selected;
+
+        if (key == ConsoleKey.UpArrow)
+            selected = selected == 0 ? options.Length - 1 : selected - 1;
+
+        if (key == ConsoleKey.DownArrow)
+            selected = selected == options.Length - 1 ? 0 : selected + 1;
+
+        if (selected != oldSelected)
+        {
+            DrawFullMenu(options, selected, menuTop, menuWidth);
+        }
+    }
+
+    Console.ResetColor();
+    Console.CursorVisible = true;
+
+    int afterMenu = Math.Min(menuTop + neededRows, Console.BufferHeight - 1);
+    Console.SetCursorPosition(0, afterMenu);
+    Console.WriteLine();
+
+    return selected;
+}
+
+static void DrawFullMenu(string[] options, int selected, int menuTop, int menuWidth)
+{
+    Console.ResetColor();
+    Console.SetCursorPosition(0, menuTop);
+    Console.WriteLine("Select".PadRight(menuWidth));
+
+    for (int i = 0; i < options.Length; i++)
+    {
+        Console.SetCursorPosition(0, menuTop + i + 1);
+
+        string line = i == selected
+            ? $"> {options[i]}"
+            : $"  {options[i]}";
+
+        if (i == selected)
+        {
+            Console.ForegroundColor = ConsoleColor.Black;
+            Console.BackgroundColor = ConsoleColor.Gray;
+            Console.Write(line.PadRight(menuWidth));
+            Console.ResetColor();
+        }
+        else
+        {
+            Console.Write(line.PadRight(menuWidth));
+        }
+    }
+}
+
+static Dictionary<string, OirMatch> LoadOpenInvoiceReport(string filePath)
+{
+    var matches = new Dictionary<string, OirMatch>();
+
+    using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+    using var workbook = new XLWorkbook(stream);
+    var worksheet = workbook.Worksheets.First();
+
+    int headerRow = FindHeaderRow(worksheet, "Consultant");
+
+    if (headerRow == -1)
+        throw new Exception("Could not find Consultant header in Open Invoice Report.");
+
+    int consultantColumn = FindColumn(worksheet, headerRow, "Consultant");
+    int serviceEndColumn = FindColumn(worksheet, headerRow, "Service End");
+    int documentNumberColumn = FindColumn(worksheet, headerRow, "Document Number");
+    int remainingAmountColumn = FindColumn(worksheet, headerRow, "Remaining Amount");
+
+    if (consultantColumn == -1 || serviceEndColumn == -1 || documentNumberColumn == -1 || remainingAmountColumn == -1)
+        throw new Exception("Could not find Consultant, Service End, Document Number, or Remaining Amount in OIR.");
+
+    int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? headerRow;
+
+    for (int row = headerRow + 1; row <= lastRow; row++)
+    {
+        string consultant = worksheet.Cell(row, consultantColumn).GetString().Trim();
+        string serviceEnd = FormatWeekEndingDate(worksheet.Cell(row, serviceEndColumn));
+
+        if (string.IsNullOrWhiteSpace(consultant) || string.IsNullOrWhiteSpace(serviceEnd))
+            continue;
+
+        string concatKey = $"{consultant} {serviceEnd}".Trim();
+        string documentNumber = worksheet.Cell(row, documentNumberColumn).GetString().Trim();
+        decimal remainingAmount = GetDecimalValue(worksheet.Cell(row, remainingAmountColumn));
+
+        if (!matches.ContainsKey(concatKey))
+        {
+            matches.Add(concatKey, new OirMatch(documentNumber, remainingAmount));
+        }
+    }
+
+    return matches;
+}
+static string? PromptForFilePath(string prompt, int startLine)
+{
+    Console.CursorVisible = true;
+
+    ClearArea(startLine, 6);
+
+    Console.SetCursorPosition(0, startLine);
+    Console.WriteLine(prompt);
+    Console.Write("> ");
+
+    int inputLine = Console.CursorTop;
+
+    string? path = Console.ReadLine()?.Trim().Trim('"');
+
+    ClearArea(startLine, 6);
+
+    return path;
+}
+
+static void ClearArea(int startLine, int numberOfLines)
+{
+    for (int i = 0; i < numberOfLines; i++)
+    {
+        int line = startLine + i;
+        if (line < 0 || line >= Console.BufferHeight) continue;
+
+        Console.SetCursorPosition(0, line);
+        Console.Write(new string(' ', Console.WindowWidth - 1));
+    }
+
+    Console.SetCursorPosition(0, startLine);
+}
+
+static void ClearLine(int line)
+{
+    if (line < 0 || line >= Console.BufferHeight) return;
+
+    Console.SetCursorPosition(0, line);
+    Console.Write(new string(' ', Console.WindowWidth - 1));
+    Console.SetCursorPosition(0, line);
+}
+
+static int FindHeaderRow(IXLWorksheet worksheet, string requiredHeader)
+{
+    int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 100;
+
+    for (int row = 1; row <= lastRow; row++)
+    {
+        for (int col = 1; col <= 100; col++)
+        {
+            string cellText = worksheet.Cell(row, col).GetString().Trim();
+
+            if (cellText.Equals(requiredHeader, StringComparison.OrdinalIgnoreCase))
+                return row;
+        }
+    }
+
+    return -1;
+}
+
+record OirMatch(string DocumentNumber, decimal RemainingAmount);
