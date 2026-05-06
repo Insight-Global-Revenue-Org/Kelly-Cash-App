@@ -28,6 +28,8 @@ string? inputPath = null;
 int defaultMenuOption = 0;
 int fixedMenuTop = Console.CursorTop;
 
+// Main application workflow loop.
+// Menu navigation, OIR imports, remittance processing (further workflows may be added)
 while (true)
 {
     int selected = ShowMenu(new[]
@@ -38,11 +40,12 @@ while (true)
     }, defaultMenuOption, fixedMenuTop);
 
     if (selected == 2)
-        return;
+        break;
 
-    // ✅ declare ONCE here (fixes your error)
     int promptTop = fixedMenuTop + 6;
 
+    // Open Invoice Report (OIR) import workflow.
+    // After importing, saves invoice/document amount mappings into system memory
     if (selected == 0)
     {
         string? oirPath = PromptForFilePath(
@@ -77,12 +80,32 @@ while (true)
         {
             openInvoiceMatches = LoadOpenInvoiceReport(oirPath);
         }
+        catch (Exception ex)
+        {
+            oirLoading = false;
+            oirSpinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("Something went wrong while importing the OIR:");
+            Console.ResetColor();
+
+            Console.WriteLine(ex.Message);
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 0;
+            continue;
+        }
         finally
         {
             oirLoading = false;
             oirSpinner.Wait();
 
-            ClearArea(promptTop, 4);
+            ClearArea(promptTop, 8);
         }
 
         ClearArea(promptTop, 4);
@@ -90,11 +113,14 @@ while (true)
         Console.WriteLine($"Imported {openInvoiceMatches.Count} OIR matches into memory.\n");
         Console.WriteLine("Press 'Enter' to process your payment");
 
-        Thread.Sleep(1000); // wait 1 second
+        Thread.Sleep(1000); 
         defaultMenuOption = 1;
         continue;
     }
 
+    // Remittance processing workflow.
+    // Normalize columns, calculate aggregates,
+    // auto-match invoices with documented amount, and generates the formatted output file.
     inputPath = PromptForFilePath(
         "Paste the full file path of the Remittance Payment:",
         promptTop
@@ -126,11 +152,14 @@ while (true)
     try
 {
     using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-    using var workbook = new XLWorkbook(stream);
+        // Open remittance workbook using the installed ClosedXML dependancy
+        // FileShare.ReadWrite allows the system to process while the file is open elsewhere.
+        using var workbook = new XLWorkbook(stream);
     var worksheet = workbook.Worksheet("Payment Details");
 
     int headerRow = 13;
-
+     
+    // This is where we dynamically locate the header columns
     int weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
     int contractorColumn = FindColumn(worksheet, headerRow, "Name");
     int lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
@@ -138,10 +167,18 @@ while (true)
 
     if (weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1 || locationDescriptionColumn == -1)
     {
-        Console.WriteLine("Could not find Week Ending Date, Name, or Line Total.");
-        return;
-    }
+            loading = false;
+            spinner.Wait();
 
+            Console.WriteLine("Could not find Week Ending Date, Name, Line Total, or Location Description.");
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+    // Normalize worksheet layout by ensuring required automation columns exist
+    // will remain in a consistent position for the downstream processing.
     NormalizeColumns(worksheet, headerRow, contractorColumn);
     InsertBlankColumn(worksheet, contractorColumn + 1, "Name_", headerRow);
 
@@ -159,10 +196,10 @@ while (true)
     // Add Concat column after Line Total
     InsertBlankColumn(worksheet, lineTotalColumn + 1, "Concat", headerRow);
 
-    // Re-find Line Total after inserting Concat
+    // Re-finding Line Total after inserting Concat
     lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
 
-    // Find the new Concat column
+    // And finding the new Concat column again for the downstream matching
     int concatColumn = FindColumnAfter(worksheet, headerRow, "Concat", lineTotalColumn);
 
     if (amountColumn == -1 || aggregateColumn == -1 || weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1)
@@ -171,9 +208,16 @@ while (true)
         Console.WriteLine($"Amount: {amountColumn}");
         Console.WriteLine($"Week Ending: {weekEndingColumn}");
         Console.WriteLine($"Contractor Name: {contractorColumn}");
-        Console.WriteLine($"Line Total: {lineTotalColumn}");
-        return;
-    }
+            loading = false;
+            spinner.Wait();
+
+            Console.WriteLine($"Line Total: {lineTotalColumn}");
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
 
     int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? headerRow;
 
@@ -187,6 +231,7 @@ while (true)
         string formattedName = FormatName(rawName);
         string formattedWeekEnding = FormatWeekEndingDate(worksheet.Cell(row, weekEndingColumn));
 
+        // Generates composite lookup key used for our automatic OIR invoice matching.
         string concatValue = $"{formattedName} {formattedWeekEnding}".Trim();
 
         worksheet.Cell(row, nameFormattedColumn).Value = formattedName;
@@ -252,6 +297,7 @@ while (true)
 
         string concatValue = worksheet.Cell(targetRow, concatColumn).GetString().Trim();
 
+        // Auto-match our remittance entries against the users imported OIR invoice data.
         if (openInvoiceMatches.TryGetValue(concatValue, out OirMatch match))
         {
             worksheet.Cell(targetRow, invoiceColumn).Value = match.DocumentNumber;
@@ -281,6 +327,7 @@ while (true)
     decimal totalAmount = GetDecimalValue(worksheet.Cell(lastRow, lineTotalColumn));
     string formattedTotal = totalAmount.ToString("N2", CultureInfo.InvariantCulture);
 
+    // Generate output filename using company name and payment total
     string outputPath = GetUniqueOutputPath(downloadsPath, $"{companyName} - {formattedTotal}.xlsx");
 
     int lastColumn = worksheet.LastColumnUsed()?.ColumnNumber() ?? lineTotalColumn;
@@ -324,6 +371,11 @@ while (true)
     }
 
 }
+
+Console.WriteLine();
+Console.WriteLine("Press any key to exit...");
+Console.ReadKey(true);
+
 static int FindColumn(IXLWorksheet worksheet, int headerRow, string headerName)
 {
     for (int col = 1; col <= 100; col++)
@@ -481,6 +533,8 @@ static string FormatWeekEndingDate(IXLCell cell)
     return rawValue;
 }
 
+// The main console gui menu rendering function. Displays a list of options, highlights the currently selected option,
+// and allows the user to navigate with the up/down arrow keys and select with Enter.
 static int ShowMenu(string[] options, int defaultSelected, int menuTop)
 {
     int selected = defaultSelected;
@@ -556,6 +610,8 @@ static void DrawFullMenu(string[] options, int selected, int menuTop, int menuWi
     }
 }
 
+// Loads and parses the Open Invoice Report (OIR)
+// into an in-memory lookup dictionary.
 static Dictionary<string, OirMatch> LoadOpenInvoiceReport(string filePath)
 {
     var matches = new Dictionary<string, OirMatch>();
@@ -618,6 +674,7 @@ static string? PromptForFilePath(string prompt, int startLine)
     return path;
 }
 
+// HELPER FUNCTION: Console region cleanup, prevent some UI duplication artifacts I encountered
 static void ClearArea(int startLine, int numberOfLines)
 {
     for (int i = 0; i < numberOfLines; i++)
@@ -631,7 +688,7 @@ static void ClearArea(int startLine, int numberOfLines)
 
     Console.SetCursorPosition(0, startLine);
 }
-
+// May remove later, not currently being used
 static void ClearLine(int line)
 {
     if (line < 0 || line >= Console.BufferHeight) return;
@@ -641,6 +698,7 @@ static void ClearLine(int line)
     Console.SetCursorPosition(0, line);
 }
 
+//HELPER FUNCTION: Dynamically locate spreadsheet header rows
 static int FindHeaderRow(IXLWorksheet worksheet, string requiredHeader)
 {
     int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 100;
@@ -659,4 +717,5 @@ static int FindHeaderRow(IXLWorksheet worksheet, string requiredHeader)
     return -1;
 }
 
+// Represents a single OIR invoice mapping entry used during auto-matching (may expand upon if more columns are needed)
 record OirMatch(string DocumentNumber, decimal RemainingAmount);
