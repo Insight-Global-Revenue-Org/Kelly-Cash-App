@@ -1,4 +1,5 @@
 ﻿using ClosedXML.Excel;
+using KellyCashApp;
 using System.Globalization;
 
 Console.ForegroundColor = ConsoleColor.White;
@@ -162,16 +163,48 @@ while (true)
 
     try
 {
-    using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-        // Open remittance workbook using the installed ClosedXML dependancy
+        using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+
+        // Open remittance workbook using the installed ClosedXML dependency
         // FileShare.ReadWrite allows the system to process while the file is open elsewhere.
         using var workbook = new XLWorkbook(stream);
-    var worksheet = workbook.Worksheet("Payment Details");
 
-    int headerRow = 13;
-     
-    // This is where we dynamically locate the header columns
-    int weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
+        IXLWorksheet worksheet;
+
+        if (workbook.TryGetWorksheet("Payment Details", out var paymentDetailsSheet))
+        {
+            worksheet = paymentDetailsSheet;
+        }
+        else
+        {
+            worksheet = workbook.Worksheet(1);
+        }
+
+        // Quick check for a Johnson & Johnson specific format and processing first 
+        if (JohnsonJohnsonPayment.IsJohnsonJohnsonFormat(worksheet))
+        {
+            string jnjOutputPath = JohnsonJohnsonPayment.Process(workbook, worksheet, inputPath);
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("Johnson & Johnson fixed-fee payment processed successfully.");
+            Console.WriteLine($"Updated file saved to: {jnjOutputPath}");
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
+        int headerRow = 13;
+
+        // This is where we dynamically locate the header columns
+        int weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
     int contractorColumn = FindColumn(worksheet, headerRow, "Name");
     int lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
     int locationDescriptionColumn = FindColumn(worksheet, headerRow, "Location Description");
