@@ -30,11 +30,7 @@ namespace KellyCashApp
 
                 if (selected == 1)
                 {
-                    Console.WriteLine("Pull Forward Full Cash Report selected.");
-                    Console.WriteLine("This workflow is not built yet.");
-                    Console.WriteLine();
-                    Console.WriteLine("Press any key to return to the Notes menu...");
-                    Console.ReadKey(true);
+                    UAC.RunFullCashReportPullForward(promptTop);
                 }
 
                 ClearArea(promptTop, 12);
