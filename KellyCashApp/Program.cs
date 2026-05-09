@@ -33,13 +33,14 @@ int fixedMenuTop = Console.CursorTop;
 while (true)
 {
     int selected = ShowMenu(new[]
-    {
-        "Import Open Invoice Report",
-        "Process Remittance Payment",
-        "Exit"
-    }, defaultMenuOption, fixedMenuTop);
+{
+    "Import Open Invoice Report",
+    "Process Remittance Payment",
+    "Pull Forward OIR/UAC",
+    "Exit"
+}, defaultMenuOption, fixedMenuTop);
 
-    if (selected == 2)
+    if (selected == 3)
         break;
 
     int promptTop = fixedMenuTop + 6;
@@ -115,6 +116,16 @@ while (true)
 
         Thread.Sleep(1000); 
         defaultMenuOption = 1;
+        continue;
+    }
+
+    if (selected == 2)
+    {
+        ClearArea(fixedMenuTop, 10);
+        KellyCashApp.OIR.ShowNotesMenu(fixedMenuTop);
+
+        ClearArea(fixedMenuTop, 10);
+        defaultMenuOption = 2;
         continue;
     }
 
@@ -717,5 +728,5 @@ static int FindHeaderRow(IXLWorksheet worksheet, string requiredHeader)
     return -1;
 }
 
-// Represents a single OIR invoice mapping entry used during auto-matching (may expand upon if more columns are needed)
+// A record for a single OIR invoice mapping entry used during auto-matching (may expand upon if more columns are needed)
 record OirMatch(string DocumentNumber, decimal RemainingAmount);
