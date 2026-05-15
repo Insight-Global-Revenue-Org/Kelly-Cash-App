@@ -30,7 +30,7 @@ int defaultMenuOption = 0;
 int fixedMenuTop = Console.CursorTop;
 
 // Main application workflow loop.
-// Menu navigation, OIR imports, remittance processing (further workflows may be added)
+// Menu navigation, OIR imports, remittance processing (Any additional process workflows will be delegated to other C# classes)
 while (true)
 {
     int selected = ShowMenu(new[]
@@ -243,7 +243,7 @@ while (true)
     // Re-finding Line Total after inserting Concat
     lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
 
-    // And finding the new Concat column again for the downstream matching
+    // And finding the new Concat column again for the downstream matching (previously was not added)
     int concatColumn = FindColumnAfter(worksheet, headerRow, "Concat", lineTotalColumn);
 
     if (amountColumn == -1 || aggregateColumn == -1 || weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1)
@@ -280,7 +280,6 @@ while (true)
 
         worksheet.Cell(row, nameFormattedColumn).Value = formattedName;
         worksheet.Cell(row, concatColumn).Value = concatValue;
-
      
     }
 
@@ -400,7 +399,7 @@ while (true)
     Console.WriteLine("\nPress 'Enter' to process another payment.");
     Console.WriteLine($"Updated file saved to: {outputPath}");
 
-        Thread.Sleep(1000); // wait 1 second
+        Thread.Sleep(1000); 
         defaultMenuOption = 1;
         continue;
     }
@@ -479,10 +478,8 @@ static void InsertBlankColumn(IXLWorksheet worksheet, int targetColumn, string h
     var designCell = worksheet.Cell(headerRow - 1, targetColumn);
     var leftCell = worksheet.Cell(headerRow - 1, targetColumn - 1);
 
-    // Copy style first
     designCell.Style = leftCell.Style;
 
-    // Remove the shared border from the LEFT column
     leftCell.Style.Border.RightBorder = XLBorderStyleValues.None;
 }
 
@@ -541,7 +538,7 @@ static string GetUniqueOutputPath(string folderPath, string fileName)
 
 static string FormatName(string input)
 {
-    // Expected: "DOE, JOHN"
+    // Expected Normalized Format: "DOE, JOHN"
     if (!input.Contains(","))
         return input;
 
@@ -553,7 +550,6 @@ static string FormatName(string input)
     string last = parts[0].Trim().ToLower();
     string first = parts[1].Trim().ToLower();
 
-    // Capitalize first letters
     last = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(last);
     first = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(first);
 
@@ -577,8 +573,8 @@ static string FormatWeekEndingDate(IXLCell cell)
     return rawValue;
 }
 
-// The main console gui menu rendering function. Displays a list of options, highlights the currently selected option,
-// and allows the user to navigate with the up/down arrow keys and select with Enter.
+// The main console gui menu rendering function. Displays list of options, highlights the currently selected option,
+// and allows the user to navigate with the up/down arrow keys and select with Enter. Any additional classes wired into the main Program.cs will also be updated here.
 static int ShowMenu(string[] options, int defaultSelected, int menuTop)
 {
     int selected = defaultSelected;
@@ -655,7 +651,7 @@ static void DrawFullMenu(string[] options, int selected, int menuTop, int menuWi
 }
 
 // Loads and parses the Open Invoice Report (OIR)
-// into an in-memory lookup dictionary.
+// into an in-memory lookup dictionary. Not persistent - if the user exits the application, they will need to re-import the OIR to have the invoice mappings available for remittance processing.
 static Dictionary<string, OirMatch> LoadOpenInvoiceReport(string filePath)
 {
     var matches = new Dictionary<string, OirMatch>();
@@ -732,7 +728,7 @@ static void ClearArea(int startLine, int numberOfLines)
 
     Console.SetCursorPosition(0, startLine);
 }
-// May remove later, not currently being used
+// May remove this helper later, not currently being used (needed for debug)
 static void ClearLine(int line)
 {
     if (line < 0 || line >= Console.BufferHeight) return;
@@ -741,8 +737,8 @@ static void ClearLine(int line)
     Console.Write(new string(' ', Console.WindowWidth - 1));
     Console.SetCursorPosition(0, line);
 }
-
-//HELPER FUNCTION: Dynamically locate spreadsheet header rows
+ 
+// Dynamically locate spreadsheet header rows
 static int FindHeaderRow(IXLWorksheet worksheet, string requiredHeader)
 {
     int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 100;

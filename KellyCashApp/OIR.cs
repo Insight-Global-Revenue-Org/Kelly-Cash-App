@@ -732,15 +732,15 @@ namespace KellyCashApp
         "Tokyo Timesheet ID"
     };
             string[] lighterHeaders =
-{
-    "Consultant",
-    "Service End",
-    "Document Amount",
-    "Remaining Amount",
-    "Percent Open",
-    "Document Number",
-    "Aging Bucket"
-};
+            {
+        "Consultant",
+        "Service End",
+        "Document Amount",
+        "Remaining Amount",
+        "Percent Open",
+        "Document Number",
+        "Aging Bucket"
+    };
 
             foreach (string header in accentHeaders)
             {
