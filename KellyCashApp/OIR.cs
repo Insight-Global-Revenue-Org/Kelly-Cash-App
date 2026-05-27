@@ -40,7 +40,7 @@ namespace KellyCashApp
         private static void RunOpenInvoicePullForward(int promptTop)
         {
             string? newOirPath = PromptForFilePath(
-                "Paste the full file path of your NEW Open Invoice Report:",
+                "Paste the full file path of your NEW Open Invoice Report::",
                 promptTop
             );
 
