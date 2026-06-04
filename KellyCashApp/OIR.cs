@@ -84,6 +84,7 @@ namespace KellyCashApp
                 });
 
                 string outputPath = ProcessOpenInvoiceReport(newOirPath, oldOirPath, out fallenOffInvoices);
+                Analytics.LogOirRun(fallenOffInvoices.Count);
 
                 loading = false;
                 spinner.Wait();

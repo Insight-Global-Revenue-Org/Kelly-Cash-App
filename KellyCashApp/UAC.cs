@@ -51,6 +51,7 @@ namespace KellyCashApp
 
                 List<string> newPayments;
                 string outputPath = ProcessFullCashReport(newUacPath, oldUacPath, out newPayments);
+                Analytics.LogUacRun(newPayments.Count);
 
                 loading = false;
                 spinner.Wait();

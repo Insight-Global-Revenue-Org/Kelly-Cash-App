@@ -39,10 +39,11 @@ while (true)
     "Process Remittance Payment",
     "Pull Forward OIR/UAC",
     "Settings",
+    "Analytics Dashboard",
     "Exit"
 }, defaultMenuOption, fixedMenuTop);
 
-    if (selected == 4)
+    if (selected == 5)
         break;
 
     int promptTop = fixedMenuTop + 6;
@@ -139,6 +140,16 @@ while (true)
         defaultMenuOption = 3;
         continue;
     }
+    if (selected == 4)
+    {
+        ClearArea(fixedMenuTop, 20);
+        KellyCashApp.Analytics.ShowAnalyticsMenu(fixedMenuTop);
+
+        ClearArea(fixedMenuTop, 20);
+        defaultMenuOption = 4;
+        continue;
+    }
+
     // Remittance processing workflow.
     // Normalize columns, calculate aggregates,
     // auto-match invoices with documented amount, and generates the formatted output file.
@@ -404,9 +415,11 @@ while (true)
 
     workbook.SaveAs(outputPath);
 
+        Analytics.LogRemittanceRun($"{companyName} - {formattedTotal}");
 
 
-    Console.WriteLine();
+
+        Console.WriteLine();
     Console.WriteLine("Week-Ending Line Totals Calculated Per Invoice Line Item");
     Console.WriteLine("All available open invoices have been automatically matched!");
     Console.WriteLine("\nPress 'Enter' to process another payment.");
