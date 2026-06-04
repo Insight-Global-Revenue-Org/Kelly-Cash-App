@@ -27,8 +27,10 @@
         {
             while (true)
             {
+                ClearArea(menuTop, 30);
+
                 int selected = ShowMenu(new[]
-{
+            {
                 "View Current Settings",
                 "Open Invoice Report Save File Path",
                 "Full Cash Save File Path",
@@ -43,14 +45,15 @@
                 if (selected == 6)
                     return;
 
-                int promptTop = menuTop + 6;
+                int promptTop = menuTop;
 
                 ClearArea(promptTop, 10);
                 Console.SetCursorPosition(0, promptTop);
 
                 if (selected == 0)
                 {
-                    ShowCurrentSettings(promptTop);
+                    ClearArea(menuTop, 30);
+                    ShowCurrentSettings(menuTop);
                 }
 
                 if (selected == 1)
@@ -278,10 +281,6 @@
 
             Console.ResetColor();
             Console.CursorVisible = true;
-
-            int afterMenu = Math.Min(menuTop + neededRows, Console.BufferHeight - 1);
-            Console.SetCursorPosition(0, afterMenu);
-            Console.WriteLine();
 
             return selected;
         }
