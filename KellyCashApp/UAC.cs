@@ -92,6 +92,13 @@ namespace KellyCashApp
 
             AddAmountOpenColumn(worksheet, headerRow);
 
+            int amountOpenColumn = FindColumn(worksheet, headerRow, "Amount Open");
+
+            if (amountOpenColumn != -1)
+            {
+                worksheet.Column(amountOpenColumn).Width = 12;
+            }
+
             string[] missingColumns = GetMissingOldHeaders(oldUacPath, worksheet, headerRow);
 
             AddColumnsToEnd(worksheet, headerRow, missingColumns);
@@ -99,12 +106,7 @@ namespace KellyCashApp
 
             ApplyFinalUacStyling(worksheet, headerRow, missingColumns);
 
-            worksheet.Columns().AdjustToContents();
-
-            string downloadsPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Downloads"
-            );
+            string downloadsPath = Settings.GetFullCashSavePath();
 
             string today = DateTime.Now.ToString("M.d.yyyy");
             string outputPath = GetUniqueOutputPath(downloadsPath, $"UAC {today}.xlsx");

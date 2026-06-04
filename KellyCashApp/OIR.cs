@@ -160,10 +160,7 @@ namespace KellyCashApp
 
             worksheet.Columns().AdjustToContents();
 
-            string downloadsPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Downloads"
-            );
+            string downloadsPath = Settings.GetOpenInvoiceReportSavePath();
 
             string today = DateTime.Now.ToString("M.d.yyyy");
             string outputPath = GetUniqueOutputPath(downloadsPath, $"OIR {today}.xlsx");
@@ -742,25 +739,32 @@ namespace KellyCashApp
         "Aging Bucket"
     };
 
-            foreach (string header in accentHeaders)
+            int agingBucketColumn = FindColumn(worksheet, headerRow, "Aging Bucket");
+
+            if (agingBucketColumn != -1)
             {
-                int column = FindColumn(worksheet, headerRow, header);
+                int lastColumn = worksheet.LastColumnUsed()?.ColumnNumber() ?? agingBucketColumn;
 
-                if (column == -1)
-                    continue;
-
-                var range = worksheet.Range(headerRow, column, lastRow, column);
-
-                range.Style.Border.TopBorder = XLBorderStyleValues.Thin;
-                range.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
-                range.Style.Border.LeftBorder = XLBorderStyleValues.Thin;
-                range.Style.Border.RightBorder = XLBorderStyleValues.Thin;
-
-                worksheet.Cell(headerRow, column).Style.Fill.BackgroundColor = XLColor.FromHtml("#FDE9D9");
-                worksheet.Cell(headerRow, column).Style.Font.Bold = false;
-                if (header.Equals("AR Status", StringComparison.OrdinalIgnoreCase))
+                for (int column = agingBucketColumn + 1; column <= lastColumn; column++)
                 {
-                    worksheet.Column(column).Width = 23;
+                    var range = worksheet.Range(headerRow, column, lastRow, column);
+
+                    range.Style.Border.TopBorder = XLBorderStyleValues.Thin;
+                    range.Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+                    range.Style.Border.LeftBorder = XLBorderStyleValues.Thin;
+                    range.Style.Border.RightBorder = XLBorderStyleValues.Thin;
+
+                    worksheet.Cell(headerRow, column).Style.Fill.BackgroundColor =
+                        XLColor.FromHtml("#FDE9D9");
+
+                    worksheet.Cell(headerRow, column).Style.Font.Bold = false;
+
+                    string header = worksheet.Cell(headerRow, column).GetString().Trim();
+
+                    if (header.Equals("AR Status", StringComparison.OrdinalIgnoreCase))
+                    {
+                        worksheet.Column(column).Width = 23;
+                    }
                 }
             }
             foreach (string header in lighterHeaders)

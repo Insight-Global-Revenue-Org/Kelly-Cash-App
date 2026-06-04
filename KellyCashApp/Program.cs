@@ -38,10 +38,11 @@ while (true)
     "Import Open Invoice Report",
     "Process Remittance Payment",
     "Pull Forward OIR/UAC",
+    "Settings",
     "Exit"
 }, defaultMenuOption, fixedMenuTop);
 
-    if (selected == 3)
+    if (selected == 4)
         break;
 
     int promptTop = fixedMenuTop + 6;
@@ -129,7 +130,15 @@ while (true)
         defaultMenuOption = 2;
         continue;
     }
+    if (selected == 3)
+    {
+        ClearArea(fixedMenuTop, 10);
+        KellyCashApp.Settings.ShowSettingsMenu(fixedMenuTop);
 
+        ClearArea(fixedMenuTop, 10);
+        defaultMenuOption = 3;
+        continue;
+    }
     // Remittance processing workflow.
     // Normalize columns, calculate aggregates,
     // auto-match invoices with documented amount, and generates the formatted output file.
@@ -265,18 +274,22 @@ while (true)
 
     int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? headerRow;
 
-    for (int row = headerRow + 1; row <= lastRow; row++)
+        var nameChanges = Rename.LoadNameChanges();
+
+        for (int row = headerRow + 1; row <= lastRow; row++)
     {
         string rawName = worksheet.Cell(row, contractorColumn).GetString().Trim();
 
         if (string.IsNullOrWhiteSpace(rawName))
             continue;
 
-        string formattedName = FormatName(rawName);
-        string formattedWeekEnding = FormatWeekEndingDate(worksheet.Cell(row, weekEndingColumn));
+            string formattedName = FormatName(rawName);
+            formattedName = Rename.ApplyNameChange(formattedName, nameChanges);
 
-        // Generates composite lookup key used for our automatic OIR invoice matching.
-        string concatValue = $"{formattedName} {formattedWeekEnding}".Trim();
+            string formattedWeekEnding = FormatWeekEndingDate(worksheet.Cell(row, weekEndingColumn));
+
+            // Generates composite lookup key used for our automatic OIR invoice matching.
+            string concatValue = $"{formattedName} {formattedWeekEnding}".Trim();
 
         worksheet.Cell(row, nameFormattedColumn).Value = formattedName;
         worksheet.Cell(row, concatColumn).Value = concatValue;
