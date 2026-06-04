@@ -39,7 +39,7 @@ while (true)
     "Process Remittance Payment",
     "Pull Forward OIR/UAC",
     "Settings",
-    "Analytics Dashboard",
+    "Analytics Logs",
     "Exit"
 }, defaultMenuOption, fixedMenuTop);
 
