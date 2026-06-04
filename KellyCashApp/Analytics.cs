@@ -133,9 +133,6 @@
                 if (title.Contains("Full Cash", StringComparison.OrdinalIgnoreCase))
                     Console.WriteLine($"Total Full Cash Runs: {lines.Length}");
 
-                if (title.Contains("Remittance", StringComparison.OrdinalIgnoreCase))
-                    Console.WriteLine($"Total Remittance Runs: {lines.Length}");
-
                 Console.WriteLine();
 
                 foreach (string line in lines.Skip(page * pageSize).Take(pageSize))
