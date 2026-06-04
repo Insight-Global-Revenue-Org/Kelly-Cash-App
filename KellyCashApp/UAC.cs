@@ -6,10 +6,10 @@ namespace KellyCashApp
     {
         public static void RunFullCashReportPullForward(int promptTop)
         {
-            string? newUacPath = PromptForFilePath(
+            string? newUacPath = FileSelector.SelectFile(
                 "Paste the full file path of your NEW Full Cash Report:",
                 promptTop
-            );
+             );
 
             if (string.IsNullOrWhiteSpace(newUacPath) || !File.Exists(newUacPath))
             {
@@ -19,7 +19,7 @@ namespace KellyCashApp
                 return;
             }
 
-            string? oldUacPath = PromptForFilePath(
+            string? oldUacPath = FileSelector.SelectFile(
                 "Paste the full file path of your OLD / notated Full Cash Report:",
                 promptTop
             );

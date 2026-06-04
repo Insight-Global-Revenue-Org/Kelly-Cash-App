@@ -52,10 +52,10 @@ while (true)
     // After importing, saves invoice/document amount mappings into system memory
     if (selected == 0)
     {
-        string? oirPath = PromptForFilePath(
-            "Paste the full file path of the Open Invoice Report:",
-            promptTop
-        );
+        string? oirPath = FileSelector.SelectFile(
+        "Paste the full file path of the Open Invoice Report:",
+        promptTop
+            );
 
         if (string.IsNullOrWhiteSpace(oirPath) || !File.Exists(oirPath))
         {
@@ -154,10 +154,10 @@ while (true)
     // Remittance processing workflow.
     // Normalize columns, calculate aggregates,
     // auto-match invoices with documented amount, and generates the formatted output file.
-    inputPath = PromptForFilePath(
+    inputPath = FileSelector.SelectFile(
         "Paste the full file path of the Remittance Payment:",
         promptTop
-    );
+            );
 
     if (string.IsNullOrWhiteSpace(inputPath) || !File.Exists(inputPath))
     {

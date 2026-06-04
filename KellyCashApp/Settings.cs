@@ -17,6 +17,9 @@
         private static string NameChangeFilePathFile =>
             Path.Combine(SettingsFolder, "name-change-file-path.txt");
 
+        private static string FileSelectionTypeFile =>
+             Path.Combine(SettingsFolder, "file-selection-type.txt");
+
         public static void ShowSettingsMenu(int menuTop)
         {
             while (true)
@@ -27,10 +30,13 @@
                     "Open Invoice Report Save File Path",
                     "Full Cash Save File Path",
                     "Name Change File Path",
+                    "File Selection Type",
                     "Back"
                     }, 0, menuTop);
 
-                if (selected == 4)
+
+
+                if (selected == 5)
                     return;
 
                 int promptTop = menuTop + 6;
@@ -70,6 +76,11 @@
                     );
                 }
 
+                if (selected == 4)
+                {
+                    SaveFileSelectionType(promptTop);
+                }
+
                 ClearArea(promptTop, 12);
             }
         }
@@ -95,6 +106,41 @@
             }
 
             return "";
+        }
+
+        public static string GetFileSelectionType()
+        {
+            if (File.Exists(FileSelectionTypeFile))
+                return File.ReadAllText(FileSelectionTypeFile).Trim();
+
+            return "Input File Path";
+        }
+
+        private static void SaveFileSelectionType(int promptTop)
+        {
+            int selected = ShowMenu(new[]
+            {
+        "Input File Path",
+        "Input File Explorer",
+        "Back"
+    }, 0, promptTop);
+
+            if (selected == 2)
+                return;
+
+            string value = selected == 0
+                ? "Input File Path"
+                : "Input File Explorer";
+
+            Directory.CreateDirectory(SettingsFolder);
+            File.WriteAllText(FileSelectionTypeFile, value);
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+            Console.WriteLine($"File Selection Type saved as: {value}");
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return...");
+            Console.ReadKey(true);
         }
 
         private static void ShowCurrentSettings(int promptTop)

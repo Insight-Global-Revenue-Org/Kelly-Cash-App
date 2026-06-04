@@ -39,10 +39,10 @@ namespace KellyCashApp
 
         private static void RunOpenInvoicePullForward(int promptTop)
         {
-            string? newOirPath = PromptForFilePath(
+            string? newOirPath = FileSelector.SelectFile(
                 "Paste the full file path of your NEW Open Invoice Report:",
                 promptTop
-            );
+            ); ;
 
             if (string.IsNullOrWhiteSpace(newOirPath) || !File.Exists(newOirPath))
             {
@@ -52,9 +52,9 @@ namespace KellyCashApp
                 return;
             }
 
-            string? oldOirPath = PromptForFilePath(
+            string? oldOirPath = FileSelector.SelectFile(
                 "Paste the full file path of your OLD / notated Open Invoice Report:",
-                promptTop
+                 promptTop
             );
 
             if (string.IsNullOrWhiteSpace(oldOirPath) || !File.Exists(oldOirPath))
