@@ -109,12 +109,13 @@ while (true)
             oirLoading = false;
             oirSpinner.Wait();
 
-            ClearArea(promptTop, 8);
+            ClearArea(promptTop, 12);
         }
 
-        ClearArea(promptTop, 4);
+        ClearArea(promptTop, 12);
         Console.SetCursorPosition(0, promptTop);
-        Console.WriteLine($"Imported {openInvoiceMatches.Count} OIR matches into memory.\n");
+        Console.WriteLine($"Imported {openInvoiceMatches.Count} OIR matches into memory.");
+        Console.WriteLine();
         Console.WriteLine("Press 'Enter' to process your payment");
 
         Thread.Sleep(1000); 
@@ -652,10 +653,15 @@ static void DrawFullMenu(string[] options, int selected, int menuTop, int menuWi
 {
     Console.ResetColor();
     Console.SetCursorPosition(0, menuTop);
-    Console.WriteLine("Select".PadRight(menuWidth));
+    Console.WriteLine("Select".PadRight(Console.WindowWidth - 1));
 
     for (int i = 0; i < options.Length; i++)
     {
+        Console.SetCursorPosition(0, menuTop + i + 1);
+
+        // Clear the entire row first
+        Console.Write(new string(' ', Console.WindowWidth - 1));
+
         Console.SetCursorPosition(0, menuTop + i + 1);
 
         string line = i == selected
@@ -682,8 +688,17 @@ static Dictionary<string, OirMatch> LoadOpenInvoiceReport(string filePath)
 {
     var matches = new Dictionary<string, OirMatch>();
 
-    using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-    using var workbook = new XLWorkbook(stream);
+    byte[] fileBytes;
+
+    using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+    {
+        using var memoryStream = new MemoryStream();
+        stream.CopyTo(memoryStream);
+        fileBytes = memoryStream.ToArray();
+    }
+
+    using var workbookStream = new MemoryStream(fileBytes);
+    using var workbook = new XLWorkbook(workbookStream);
     var worksheet = workbook.Worksheets.First();
 
     int headerRow = FindHeaderRow(worksheet, "Consultant");
