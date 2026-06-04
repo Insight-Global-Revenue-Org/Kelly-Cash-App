@@ -225,7 +225,7 @@ while (true)
         // Conditional check for Monument payments (Re-Routing)
         if (MonumentPayment.IsMonumentFormat(worksheet))
         {
-            string monumentOutputPath = MonumentPayment.Process(workbook, worksheet, inputPath);
+            string monumentOutputPath = MonumentPayment.Process(workbook, worksheet, inputPath, openInvoiceMatches);
 
             loading = false;
             spinner.Wait();
@@ -400,12 +400,9 @@ while (true)
         }
     }
 
-    string downloadsPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        "Downloads"
-    );
+        string downloadsPath = Settings.GetRemittanceSavePath();
 
-    string companyName = worksheet.Cell(headerRow + 1, locationDescriptionColumn).GetString().Trim();
+        string companyName = worksheet.Cell(headerRow + 1, locationDescriptionColumn).GetString().Trim();
 
     if (string.IsNullOrWhiteSpace(companyName))
     {

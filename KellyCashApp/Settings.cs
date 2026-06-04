@@ -14,6 +14,9 @@
         private static string UacSavePathFile =>
             Path.Combine(SettingsFolder, "uac-save-path.txt");
 
+        private static string RemittanceSavePathFile =>
+            Path.Combine(SettingsFolder, "remittance-save-path.txt");
+
         private static string NameChangeFilePathFile =>
             Path.Combine(SettingsFolder, "name-change-file-path.txt");
 
@@ -26,17 +29,18 @@
             {
                 int selected = ShowMenu(new[]
 {
-                    "View Current Settings",
-                    "Open Invoice Report Save File Path",
-                    "Full Cash Save File Path",
-                    "Name Change File Path",
-                    "File Selection Type",
-                    "Back"
-                    }, 0, menuTop);
+                "View Current Settings",
+                "Open Invoice Report Save File Path",
+                "Full Cash Save File Path",
+                "Remittance Payment Save File Path",
+                "Name Change File Path",
+                "File Selection Type",
+                "Back"
+            }, 0, menuTop);
 
 
 
-                if (selected == 5)
+                if (selected == 6)
                     return;
 
                 int promptTop = menuTop + 6;
@@ -69,14 +73,23 @@
 
                 if (selected == 3)
                 {
-                    SaveFilePathSetting(
-                        "Paste the full .txt file path for contractor name changes:",
-                        NameChangeFilePathFile,
+                    SavePathSetting(
+                        "Paste the folder path where Remittance Payment files should save:",
+                        RemittanceSavePathFile,
                         promptTop
                     );
                 }
 
                 if (selected == 4)
+                {
+                    SaveFilePathSetting(
+                        "Paste the full .txt or Excel file path for contractor name changes:",
+                        NameChangeFilePathFile,
+                        promptTop
+                    );
+                }
+
+                if (selected == 5)
                 {
                     SaveFileSelectionType(promptTop);
                 }
@@ -88,6 +101,11 @@
         public static string GetOpenInvoiceReportSavePath()
         {
             return GetSavedPath(OirSavePathFile);
+        }
+
+        public static string GetRemittanceSavePath()
+        {
+            return GetSavedPath(RemittanceSavePathFile);
         }
 
         public static string GetFullCashSavePath()
@@ -158,6 +176,10 @@
 
             Console.WriteLine($"Full Cash Save Path:");
             Console.WriteLine(GetFullCashSavePath());
+            Console.WriteLine();
+
+            Console.WriteLine("Remittance Payment Save Path:");
+            Console.WriteLine(GetRemittanceSavePath());
             Console.WriteLine();
 
             Console.WriteLine("Name Change File Path:");

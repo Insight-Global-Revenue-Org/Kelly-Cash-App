@@ -1,4 +1,6 @@
-﻿namespace KellyCashApp
+﻿using ClosedXML.Excel;
+
+namespace KellyCashApp
 {
     internal class Rename
     {
@@ -14,7 +16,23 @@
             if (!File.Exists(nameChangeFilePath))
                 return nameChanges;
 
-            foreach (string line in File.ReadAllLines(nameChangeFilePath))
+            string extension = Path.GetExtension(nameChangeFilePath).ToLower();
+
+            if (extension == ".xlsx" || extension == ".xls")
+            {
+                LoadNameChangesFromExcel(nameChangeFilePath, nameChanges);
+            }
+            else
+            {
+                LoadNameChangesFromText(nameChangeFilePath, nameChanges);
+            }
+
+            return nameChanges;
+        }
+
+        private static void LoadNameChangesFromText(string filePath, Dictionary<string, string> nameChanges)
+        {
+            foreach (string line in File.ReadAllLines(filePath))
             {
                 if (string.IsNullOrWhiteSpace(line))
                     continue;
@@ -24,24 +42,39 @@
                 if (parts.Length < 2)
                     continue;
 
-                string oldName = parts[0].Trim();
-                string newName = parts[1].Trim();
-
-                if (string.IsNullOrWhiteSpace(oldName) || string.IsNullOrWhiteSpace(newName))
-                    continue;
-
-                nameChanges[oldName] = newName;
+                AddNameChange(parts[0], parts[1], nameChanges);
             }
+        }
 
-            return nameChanges;
+        private static void LoadNameChangesFromExcel(string filePath, Dictionary<string, string> nameChanges)
+        {
+            using var workbook = new XLWorkbook(filePath);
+            var worksheet = workbook.Worksheets.First();
+
+            foreach (var row in worksheet.RowsUsed())
+            {
+                string oldName = row.Cell(1).GetString().Trim();
+                string newName = row.Cell(2).GetString().Trim();
+
+                AddNameChange(oldName, newName, nameChanges);
+            }
+        }
+
+        private static void AddNameChange(string oldName, string newName, Dictionary<string, string> nameChanges)
+        {
+            oldName = oldName.Trim();
+            newName = newName.Trim();
+
+            if (string.IsNullOrWhiteSpace(oldName) || string.IsNullOrWhiteSpace(newName))
+                return;
+
+            nameChanges[oldName] = newName;
         }
 
         public static string ApplyNameChange(string formattedName, Dictionary<string, string> nameChanges)
         {
             if (nameChanges.TryGetValue(formattedName, out string? newName))
-            {
                 return newName;
-            }
 
             return formattedName;
         }

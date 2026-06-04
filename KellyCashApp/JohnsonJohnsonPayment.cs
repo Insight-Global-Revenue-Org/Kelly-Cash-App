@@ -61,10 +61,7 @@ namespace KellyCashApp
 
             worksheet.Columns().AdjustToContents();
 
-            string downloadsPath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Downloads"
-            );
+            string downloadsPath = Settings.GetRemittanceSavePath();
 
             string outputPath = GetUniqueOutputPath(downloadsPath, "Johnson & Johnson Fixed Fee Payment.xlsx");
 
