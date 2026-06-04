@@ -201,7 +201,7 @@ while (true)
             worksheet = workbook.Worksheet(1);
         }
 
-        // Quick check for a Johnson & Johnson specific format and processing first 
+        // Conditional check for Johnson & Johnson payments (Re-Routing)
         if (JohnsonJohnsonPayment.IsJohnsonJohnsonFormat(worksheet))
         {
             string jnjOutputPath = JohnsonJohnsonPayment.Process(workbook, worksheet, inputPath);
@@ -221,6 +221,28 @@ while (true)
             defaultMenuOption = 1;
             continue;
         }
+
+        // Conditional check for Monument payments (Re-Routing)
+        if (MonumentPayment.IsMonumentFormat(worksheet))
+        {
+            string monumentOutputPath = MonumentPayment.Process(workbook, worksheet, inputPath);
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("Monument payment processed successfully.");
+            Console.WriteLine($"Updated file saved to: {monumentOutputPath}");
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
 
         int headerRow = 13;
 
