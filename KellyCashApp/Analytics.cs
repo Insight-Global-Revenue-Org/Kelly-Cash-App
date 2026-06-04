@@ -56,7 +56,7 @@
                 ClearArea(promptTop, 20);
 
                 if (selected == 0)
-                    ShowStats("Open Invoice Report Stats", OirStatsFile, "Dropped Invoices", promptTop);
+                    ShowStats("Open Invoice Report Stats", OirStatsFile, "Total All-Time Dropped Invoices", promptTop);
 
                 if (selected == 1)
                     ShowStats("Full Cash Stats", UacStatsFile, "New Payments", promptTop);
