@@ -245,8 +245,9 @@ while (true)
 
 
         int headerRow = 13;
+        // test
 
-        // This is where we dynamically locate the header columns
+        // This is where we dynamically locate the header columns 
         int weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
     int contractorColumn = FindColumn(worksheet, headerRow, "Name");
     int lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
