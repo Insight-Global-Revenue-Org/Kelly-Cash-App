@@ -241,6 +241,49 @@ namespace KellyCashApp
                 });
             }
 
+            var seenContractorKeys = new HashSet<string>();
+            var aggregatedOutputRows = new List<MonumentOutputRow>();
+
+            foreach (var row in outputRows)
+            {
+                if (!row.IsContractor)
+                {
+                    aggregatedOutputRows.Add(row);
+                    continue;
+                }
+
+                string key = $"{row.Invoice}|{row.Concat}|{row.Name}|{row.WeekEndingDate}";
+
+                if (seenContractorKeys.Contains(key))
+                    continue;
+
+                var matchingRows = outputRows
+                    .Where(other =>
+                        other.IsContractor
+                        && other.Invoice == row.Invoice
+                        && other.Concat == row.Concat
+                        && other.Name == row.Name
+                        && other.WeekEndingDate == row.WeekEndingDate)
+                    .ToList();
+
+                row.AggregateAmountPaid = matchingRows.Sum(other => other.AggregateAmountPaid);
+
+                row.Credit = string.Join(", ",
+                    matchingRows.Select(other => other.Credit)
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Distinct());
+
+                row.MonumentInvoice = string.Join(", ",
+                    matchingRows.Select(other => other.MonumentInvoice)
+                        .Where(value => !string.IsNullOrWhiteSpace(value))
+                        .Distinct());
+
+                aggregatedOutputRows.Add(row);
+                seenContractorKeys.Add(key);
+            }
+
+            outputRows = aggregatedOutputRows;
+
             worksheet.Clear();
 
             string[] headers =
