@@ -371,7 +371,7 @@ namespace KellyCashApp
             {
                 decimal aggregateAmountPaid = GetDecimalValue(worksheet.Cell(row, 5));
 
-                if (aggregateAmountPaid < 0)
+                if (aggregateAmountPaid <= 0)
                     worksheet.Cell(row, 5).Style.Font.FontColor = XLColor.Red;
             }
 
