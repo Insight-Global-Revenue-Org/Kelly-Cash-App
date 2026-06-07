@@ -119,6 +119,7 @@ namespace KellyCashApp.Workflows
             return outputPath;
         }
 
+        // Column normalization idk
         private static string[] GetMissingOldHeaders(string oldUacPath, IXLWorksheet newWorksheet, int newHeaderRow)
         {
             using var stream = new FileStream(oldUacPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);

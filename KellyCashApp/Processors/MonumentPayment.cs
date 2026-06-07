@@ -1,4 +1,5 @@
 ﻿using ClosedXML.Excel;
+<<<<<<< HEAD:KellyCashApp/Processors/MonumentPayment.cs
 using KellyCashApp.Configuration;
 using KellyCashApp.Models;
 using KellyCashApp.Services;
@@ -6,6 +7,12 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace KellyCashApp.Processors
+=======
+using System.Globalization;
+using System.Text.RegularExpressions;
+
+namespace KellyCashApp
+>>>>>>> fd4192c1fc973185485463c4e27a69db29297d34:KellyCashApp/MonumentPayment.cs
 {
     internal class MonumentPayment
     {

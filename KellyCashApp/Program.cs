@@ -122,7 +122,7 @@ while (true)
         Console.WriteLine();
         Console.WriteLine("Press 'Enter' to process your payment");
 
-        Thread.Sleep(1000); 
+        Thread.Sleep(1000);
         defaultMenuOption = 1;
         continue;
     }
@@ -187,7 +187,7 @@ while (true)
     });
 
     try
-{
+    {
         using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
         // Open remittance workbook using the installed ClosedXML dependency
@@ -252,12 +252,12 @@ while (true)
 
         // This is where we will dynamically locate the header columns
         int weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
-    int contractorColumn = FindColumn(worksheet, headerRow, "Name");
-    int lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
-    int locationDescriptionColumn = FindColumn(worksheet, headerRow, "Location Description");
+        int contractorColumn = FindColumn(worksheet, headerRow, "Name");
+        int lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
+        int locationDescriptionColumn = FindColumn(worksheet, headerRow, "Location Description");
 
-    if (weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1 || locationDescriptionColumn == -1)
-    {
+        if (weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1 || locationDescriptionColumn == -1)
+        {
             loading = false;
             spinner.Wait();
 
@@ -268,37 +268,37 @@ while (true)
             defaultMenuOption = 1;
             continue;
         }
-    // Normalize worksheet layout by ensuring required automation columns exist
-    // will remain in a consistent position for the downstream processing.
-    NormalizeColumns(worksheet, headerRow, contractorColumn);
-    InsertBlankColumn(worksheet, contractorColumn + 1, "Name_", headerRow);
+        // Normalize worksheet layout by ensuring required automation columns exist
+        // will remain in a consistent position for the downstream processing.
+        NormalizeColumns(worksheet, headerRow, contractorColumn);
+        InsertBlankColumn(worksheet, contractorColumn + 1, "Name_", headerRow);
 
-    // Re-find columns after normalization
-    int invoiceColumn = FindColumnAfter(worksheet, headerRow, "Invoice", contractorColumn);
-    int amountColumn = FindColumnAfter(worksheet, headerRow, "Amount", contractorColumn);
-    int aggregateColumn = FindColumn(worksheet, headerRow, "Aggregate Line Total");
-    int notesColumn = FindColumn(worksheet, headerRow, "Notes");
+        // Re-find columns after normalization
+        int invoiceColumn = FindColumnAfter(worksheet, headerRow, "Invoice", contractorColumn);
+        int amountColumn = FindColumnAfter(worksheet, headerRow, "Amount", contractorColumn);
+        int aggregateColumn = FindColumn(worksheet, headerRow, "Aggregate Line Total");
+        int notesColumn = FindColumn(worksheet, headerRow, "Notes");
 
-    weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
-    contractorColumn = FindColumn(worksheet, headerRow, "Name");
-    int nameFormattedColumn = FindColumnAfter(worksheet, headerRow, "Name_", contractorColumn);
-    lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
+        weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
+        contractorColumn = FindColumn(worksheet, headerRow, "Name");
+        int nameFormattedColumn = FindColumnAfter(worksheet, headerRow, "Name_", contractorColumn);
+        lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
 
-    // Add Concat column after Line Total
-    InsertBlankColumn(worksheet, lineTotalColumn + 1, "Concat", headerRow);
+        // Add Concat column after Line Total
+        InsertBlankColumn(worksheet, lineTotalColumn + 1, "Concat", headerRow);
 
-    // Re-finding Line Total after inserting Concat
-    lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
+        // Re-finding Line Total after inserting Concat
+        lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
 
-    // And finding the new Concat column again for the downstream matching (previously was not added)
-    int concatColumn = FindColumnAfter(worksheet, headerRow, "Concat", lineTotalColumn);
+        // And finding the new Concat column again for the downstream matching (previously was not added)
+        int concatColumn = FindColumnAfter(worksheet, headerRow, "Concat", lineTotalColumn);
 
-    if (amountColumn == -1 || aggregateColumn == -1 || weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1)
-    {
-        Console.WriteLine("Could not find one or more required columns.");
-        Console.WriteLine($"Amount: {amountColumn}");
-        Console.WriteLine($"Week Ending: {weekEndingColumn}");
-        Console.WriteLine($"Contractor Name: {contractorColumn}");
+        if (amountColumn == -1 || aggregateColumn == -1 || weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1)
+        {
+            Console.WriteLine("Could not find one or more required columns.");
+            Console.WriteLine($"Amount: {amountColumn}");
+            Console.WriteLine($"Week Ending: {weekEndingColumn}");
+            Console.WriteLine($"Contractor Name: {contractorColumn}");
             loading = false;
             spinner.Wait();
 
@@ -310,16 +310,16 @@ while (true)
             continue;
         }
 
-    int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? headerRow;
+        int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? headerRow;
 
         var nameChanges = Rename.LoadNameChanges();
 
         for (int row = headerRow + 1; row <= lastRow; row++)
-    {
-        string rawName = worksheet.Cell(row, contractorColumn).GetString().Trim();
+        {
+            string rawName = worksheet.Cell(row, contractorColumn).GetString().Trim();
 
-        if (string.IsNullOrWhiteSpace(rawName))
-            continue;
+            if (string.IsNullOrWhiteSpace(rawName))
+                continue;
 
             string formattedName = FormatName(rawName);
             formattedName = Rename.ApplyNameChange(formattedName, nameChanges);
@@ -329,127 +329,127 @@ while (true)
             // Generates composite lookup key used for our automatic OIR invoice matching.
             string concatValue = $"{formattedName} {formattedWeekEnding}".Trim();
 
-        worksheet.Cell(row, nameFormattedColumn).Value = formattedName;
-        worksheet.Cell(row, concatColumn).Value = concatValue;
-     
-    }
+            worksheet.Cell(row, nameFormattedColumn).Value = formattedName;
+            worksheet.Cell(row, concatColumn).Value = concatValue;
 
-    loading = false;
-    spinner.Wait();
-
-    Console.Write("\r" + new string(' ', 60)); 
-    Console.WriteLine(); 
-
-    Console.WriteLine($"Found Amount column: {amountColumn}");
-    Console.WriteLine($"Found Week Ending column: {weekEndingColumn}");
-    Console.WriteLine($"Found Contractor Name column: {contractorColumn}");
-    Console.WriteLine($"Found Line Total column: {lineTotalColumn}");
-    Console.WriteLine($"Found Aggregate column: {aggregateColumn}");
-
-    // First pass: calculate totals up to last row for each Contractor + Week Ending
-    var totalsByContractorAndWeek = new Dictionary<string, decimal>();
-    var lastRowByContractorAndWeek = new Dictionary<string, int>();
-
-    for (int row = headerRow + 1; row < lastRow; row++)
-    {
-        string contractor = worksheet.Cell(row, contractorColumn).GetString().Trim();
-        string weekEnding = worksheet.Cell(row, weekEndingColumn).GetString().Trim();
-
-        if (string.IsNullOrWhiteSpace(contractor) || string.IsNullOrWhiteSpace(weekEnding))
-            continue;
-
-        decimal lineTotal = GetDecimalValue(worksheet.Cell(row, lineTotalColumn));
-        string key = $"{contractor}|{weekEnding}";
-
-        if (!totalsByContractorAndWeek.ContainsKey(key))
-            totalsByContractorAndWeek[key] = 0;
-
-        totalsByContractorAndWeek[key] += lineTotal;
-        lastRowByContractorAndWeek[key] = row;
-    }
-
-    // Second pass: write aggregate total to the last row for each contractor
-    foreach (var item in totalsByContractorAndWeek)
-    {
-        string key = item.Key;
-        decimal aggregateTotal = item.Value;
-        int targetRow = lastRowByContractorAndWeek[key];
-
-        var cell = worksheet.Cell(targetRow, aggregateColumn);
-
-        cell.Value = aggregateTotal;
-
-        cell.Style = worksheet.Cell(targetRow, lineTotalColumn).Style;
-
-        cell.Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
-
-        // Are credits applied? If so, make negative totals red so MSP can identify
-        if (aggregateTotal < 0)
-        {
-            cell.Style.Font.FontColor = XLColor.Red;
         }
 
-        string concatValue = worksheet.Cell(targetRow, concatColumn).GetString().Trim();
+        loading = false;
+        spinner.Wait();
 
-        // Auto-match our remittance entries against the users imported OIR invoice data.
-        if (openInvoiceMatches.TryGetValue(concatValue, out OirMatch match))
+        Console.Write("\r" + new string(' ', 60));
+        Console.WriteLine();
+
+        Console.WriteLine($"Found Amount column: {amountColumn}");
+        Console.WriteLine($"Found Week Ending column: {weekEndingColumn}");
+        Console.WriteLine($"Found Contractor Name column: {contractorColumn}");
+        Console.WriteLine($"Found Line Total column: {lineTotalColumn}");
+        Console.WriteLine($"Found Aggregate column: {aggregateColumn}");
+
+        // First pass: calculate totals up to last row for each Contractor + Week Ending
+        var totalsByContractorAndWeek = new Dictionary<string, decimal>();
+        var lastRowByContractorAndWeek = new Dictionary<string, int>();
+
+        for (int row = headerRow + 1; row < lastRow; row++)
         {
-            worksheet.Cell(targetRow, invoiceColumn).Value = match.DocumentNumber;
-            worksheet.Cell(targetRow, amountColumn).Value = match.RemainingAmount;
+            string contractor = worksheet.Cell(row, contractorColumn).GetString().Trim();
+            string weekEnding = worksheet.Cell(row, weekEndingColumn).GetString().Trim();
 
-            worksheet.Cell(targetRow, amountColumn).Style =
-                worksheet.Cell(targetRow, lineTotalColumn).Style;
+            if (string.IsNullOrWhiteSpace(contractor) || string.IsNullOrWhiteSpace(weekEnding))
+                continue;
 
-            worksheet.Cell(targetRow, amountColumn).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
+            decimal lineTotal = GetDecimalValue(worksheet.Cell(row, lineTotalColumn));
+            string key = $"{contractor}|{weekEnding}";
+
+            if (!totalsByContractorAndWeek.ContainsKey(key))
+                totalsByContractorAndWeek[key] = 0;
+
+            totalsByContractorAndWeek[key] += lineTotal;
+            lastRowByContractorAndWeek[key] = row;
         }
-    }
+
+        // Second pass: write aggregate total to the last row for each contractor
+        foreach (var item in totalsByContractorAndWeek)
+        {
+            string key = item.Key;
+            decimal aggregateTotal = item.Value;
+            int targetRow = lastRowByContractorAndWeek[key];
+
+            var cell = worksheet.Cell(targetRow, aggregateColumn);
+
+            cell.Value = aggregateTotal;
+
+            cell.Style = worksheet.Cell(targetRow, lineTotalColumn).Style;
+
+            cell.Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
+
+            // Are credits applied? If so, make negative totals red so MSP can identify
+            if (aggregateTotal < 0)
+            {
+                cell.Style.Font.FontColor = XLColor.Red;
+            }
+
+            string concatValue = worksheet.Cell(targetRow, concatColumn).GetString().Trim();
+
+            // Auto-match our remittance entries against the users imported OIR invoice data.
+            if (openInvoiceMatches.TryGetValue(concatValue, out OirMatch match))
+            {
+                worksheet.Cell(targetRow, invoiceColumn).Value = match.DocumentNumber;
+                worksheet.Cell(targetRow, amountColumn).Value = match.RemainingAmount;
+
+                worksheet.Cell(targetRow, amountColumn).Style =
+                    worksheet.Cell(targetRow, lineTotalColumn).Style;
+
+                worksheet.Cell(targetRow, amountColumn).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
+            }
+        }
 
         string downloadsPath = Settings.GetRemittanceSavePath();
 
         string companyName = worksheet.Cell(headerRow + 1, locationDescriptionColumn).GetString().Trim();
 
-    if (string.IsNullOrWhiteSpace(companyName))
-    {
-        companyName = "Remittance Payment";
-    }
+        if (string.IsNullOrWhiteSpace(companyName))
+        {
+            companyName = "Remittance Payment";
+        }
 
-    companyName = MakeSafeFileName(companyName);
+        companyName = MakeSafeFileName(companyName);
 
-    decimal totalAmount = GetDecimalValue(worksheet.Cell(lastRow, lineTotalColumn));
-    string formattedTotal = totalAmount.ToString("N2", CultureInfo.InvariantCulture);
+        decimal totalAmount = GetDecimalValue(worksheet.Cell(lastRow, lineTotalColumn));
+        string formattedTotal = totalAmount.ToString("N2", CultureInfo.InvariantCulture);
 
-    // Generate output filename using company name and payment total
-    string outputPath = GetUniqueOutputPath(downloadsPath, $"{companyName} - {formattedTotal}.xlsx");
+        // Generate output filename using company name and payment total
+        string outputPath = GetUniqueOutputPath(downloadsPath, $"{companyName} - {formattedTotal}.xlsx");
 
-    int lastColumn = worksheet.LastColumnUsed()?.ColumnNumber() ?? lineTotalColumn;
+        int lastColumn = worksheet.LastColumnUsed()?.ColumnNumber() ?? lineTotalColumn;
 
-    if (worksheet.AutoFilter.IsEnabled)
-    {
-        worksheet.AutoFilter.Clear();
-    }
+        if (worksheet.AutoFilter.IsEnabled)
+        {
+            worksheet.AutoFilter.Clear();
+        }
 
-    worksheet.Range(headerRow, 1, lastRow, lastColumn).SetAutoFilter();
+        worksheet.Range(headerRow, 1, lastRow, lastColumn).SetAutoFilter();
 
-    worksheet.Column(invoiceColumn).Width = 16;
-    worksheet.Column(amountColumn).Width = 14;
-    worksheet.Column(aggregateColumn).Width = 20;
-    worksheet.Column(notesColumn).Width = 24;
-    worksheet.Column(nameFormattedColumn).Width = 18;
-    worksheet.Column(concatColumn).Width = 28;
+        worksheet.Column(invoiceColumn).Width = 16;
+        worksheet.Column(amountColumn).Width = 14;
+        worksheet.Column(aggregateColumn).Width = 20;
+        worksheet.Column(notesColumn).Width = 24;
+        worksheet.Column(nameFormattedColumn).Width = 18;
+        worksheet.Column(concatColumn).Width = 28;
 
-    workbook.SaveAs(outputPath);
+        workbook.SaveAs(outputPath);
 
         Analytics.LogRemittanceRun($"{companyName} - {formattedTotal}");
 
 
 
         Console.WriteLine();
-    Console.WriteLine("Week-Ending Line Totals Calculated Per Invoice Line Item");
-    Console.WriteLine("All available open invoices have been automatically matched!");
-    Console.WriteLine("\nPress 'Enter' to process another payment.");
-    Console.WriteLine($"Updated file saved to: {outputPath}");
+        Console.WriteLine("Week-Ending Line Totals Calculated Per Invoice Line Item");
+        Console.WriteLine("All available open invoices have been automatically matched!");
+        Console.WriteLine("\nPress 'Enter' to process another payment.");
+        Console.WriteLine($"Updated file saved to: {outputPath}");
 
-        Thread.Sleep(1000); 
+        Thread.Sleep(1000);
         defaultMenuOption = 1;
         continue;
     }
@@ -750,7 +750,7 @@ static void ClearLine(int line)
     Console.Write(new string(' ', Console.WindowWidth - 1));
     Console.SetCursorPosition(0, line);
 }
- 
+
 // Dynamically locate spreadsheet header rows
 static int FindHeaderRow(IXLWorksheet worksheet, string requiredHeader)
 {
