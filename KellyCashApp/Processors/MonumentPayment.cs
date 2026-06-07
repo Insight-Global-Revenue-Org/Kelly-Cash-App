@@ -1,8 +1,11 @@
 ﻿using ClosedXML.Excel;
+using KellyCashApp.Configuration;
+using KellyCashApp.Models;
+using KellyCashApp.Services;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace KellyCashApp
+namespace KellyCashApp.Processors
 {
     internal class MonumentPayment
     {

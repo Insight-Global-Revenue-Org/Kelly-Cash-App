@@ -1,6 +1,7 @@
 ﻿using System.Windows.Forms;
+using KellyCashApp.Configuration;
 
-namespace KellyCashApp
+namespace KellyCashApp.Services
 {
     internal class FileSelector
     {

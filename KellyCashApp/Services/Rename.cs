@@ -1,6 +1,7 @@
 ﻿using ClosedXML.Excel;
+using KellyCashApp.Configuration;
 
-namespace KellyCashApp
+namespace KellyCashApp.Services
 {
     internal class Rename
     {

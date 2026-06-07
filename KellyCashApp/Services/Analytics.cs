@@ -1,4 +1,4 @@
-﻿namespace KellyCashApp
+﻿namespace KellyCashApp.Services
 {
     internal class Analytics
     {

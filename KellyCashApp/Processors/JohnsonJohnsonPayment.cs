@@ -1,7 +1,8 @@
 ﻿using ClosedXML.Excel;
+using KellyCashApp.Configuration;
 using System.Globalization;
 
-namespace KellyCashApp
+namespace KellyCashApp.Processors
 {
     public class JohnsonJohnsonPayment
     {

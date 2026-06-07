@@ -1,4 +1,4 @@
-﻿namespace KellyCashApp
+﻿namespace KellyCashApp.Configuration
 {
     internal class Settings
     {

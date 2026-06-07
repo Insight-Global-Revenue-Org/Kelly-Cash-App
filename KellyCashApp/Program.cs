@@ -1,5 +1,9 @@
 ﻿using ClosedXML.Excel;
-using KellyCashApp;
+using KellyCashApp.Configuration;
+using KellyCashApp.Models;
+using KellyCashApp.Processors;
+using KellyCashApp.Services;
+using KellyCashApp.Workflows;
 using System.Globalization;
 
 Console.ForegroundColor = ConsoleColor.White;
@@ -126,7 +130,7 @@ while (true)
     if (selected == 2)
     {
         ClearArea(fixedMenuTop, 10);
-        KellyCashApp.OIR.ShowNotesMenu(fixedMenuTop);
+        OIR.ShowNotesMenu(fixedMenuTop);
 
         ClearArea(fixedMenuTop, 10);
         defaultMenuOption = 2;
@@ -135,7 +139,7 @@ while (true)
     if (selected == 3)
     {
         ClearArea(fixedMenuTop, 10);
-        KellyCashApp.Settings.ShowSettingsMenu(fixedMenuTop);
+        Settings.ShowSettingsMenu(fixedMenuTop);
 
         ClearArea(fixedMenuTop, 10);
         defaultMenuOption = 3;
@@ -144,7 +148,7 @@ while (true)
     if (selected == 4)
     {
         ClearArea(fixedMenuTop, 20);
-        KellyCashApp.Analytics.ShowAnalyticsMenu(fixedMenuTop);
+        Analytics.ShowAnalyticsMenu(fixedMenuTop);
 
         ClearArea(fixedMenuTop, 20);
         defaultMenuOption = 4;

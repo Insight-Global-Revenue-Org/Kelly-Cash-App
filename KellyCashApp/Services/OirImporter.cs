@@ -1,9 +1,10 @@
 ﻿using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
+using KellyCashApp.Models;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace KellyCashApp
+namespace KellyCashApp.Services
 {
     internal static class OirImporter
     {
