@@ -1,4 +1,6 @@
-﻿namespace KellyCashApp.Services
+﻿using System.Diagnostics;
+
+namespace KellyCashApp.Services
 {
     internal class Analytics
     {
@@ -46,10 +48,11 @@
                     "Open Invoice Report Stats",
                     "Full Cash Stats",
                     "Remittance Payment Stats",
+                    "View Local Storage",
                     "Back"
-                }, 0, menuTop);
+                    }, 0, menuTop);
 
-                if (selected == 3)
+                if (selected == 4)
                     return;
 
                 int promptTop = menuTop + 6;
@@ -63,6 +66,11 @@
 
                 if (selected == 2)
                     ShowStats("Remittance Payment Stats", RemittanceStatsFile, "Processed Payments", promptTop);
+
+                if (selected == 3)
+                {
+                    OpenLocalStorage(promptTop);
+                }
 
                 ClearArea(promptTop, 22);
             }
@@ -200,6 +208,26 @@
             Console.WriteLine();
 
             return selected;
+        }
+
+        private static void OpenLocalStorage(int promptTop)
+        {
+            Directory.CreateDirectory(AnalyticsFolder);
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = AnalyticsFolder,
+                UseShellExecute = true
+            });
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("Opened local analytics storage:");
+            Console.WriteLine(AnalyticsFolder);
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return...");
+            Console.ReadKey(true);
         }
 
         private static void DrawFullMenu(string[] options, int selected, int menuTop, int menuWidth)
