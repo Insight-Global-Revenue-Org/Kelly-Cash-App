@@ -7,7 +7,19 @@ namespace KellyCashApp
         public static string? SelectFile(string prompt, int startLine)
         {
             if (Settings.GetFileSelectionType() == "Input File Explorer")
-                return OpenFileExplorer();
+            {
+                Console.CursorVisible = false;
+                ClearArea(startLine, 6);
+                Console.SetCursorPosition(0, startLine);
+
+                Console.WriteLine(prompt);
+                Console.WriteLine("Select in the File Explorer window...");
+
+                string? selectedPath = OpenFileExplorer();
+
+                ClearArea(startLine, 6);
+                return selectedPath;
+            }
 
             return PromptForFilePath(prompt, startLine);
         }
@@ -40,6 +52,22 @@ namespace KellyCashApp
             thread.Join();
 
             return selectedPath;
+        }
+
+        private static void ClearArea(int startLine, int numberOfLines)
+        {
+            for (int i = 0; i < numberOfLines; i++)
+            {
+                int line = startLine + i;
+
+                if (line < 0 || line >= Console.BufferHeight)
+                    continue;
+
+                Console.SetCursorPosition(0, line);
+                Console.Write(new string(' ', Console.WindowWidth - 1));
+            }
+
+            Console.SetCursorPosition(0, startLine);
         }
 
         private static string _lastDirectory =

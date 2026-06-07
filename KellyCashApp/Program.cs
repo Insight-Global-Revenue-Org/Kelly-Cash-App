@@ -82,7 +82,7 @@ while (true)
 
         try
         {
-            openInvoiceMatches = LoadOpenInvoiceReport(oirPath);
+            openInvoiceMatches = OirImporter.Load(oirPath);
         }
         catch (Exception ex)
         {
@@ -703,58 +703,7 @@ static void DrawFullMenu(string[] options, int selected, int menuTop, int menuWi
 
 // Loads and parses the Open Invoice Report (OIR)
 // into an in-memory lookup dictionary. Not persistent - if the user exits the application, they will need to re-import the OIR to have the invoice mappings available for remittance processing.
-static Dictionary<string, OirMatch> LoadOpenInvoiceReport(string filePath)
-{
-    var matches = new Dictionary<string, OirMatch>();
 
-    byte[] fileBytes;
-
-    using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-    {
-        using var memoryStream = new MemoryStream();
-        stream.CopyTo(memoryStream);
-        fileBytes = memoryStream.ToArray();
-    }
-
-    using var workbookStream = new MemoryStream(fileBytes);
-    using var workbook = new XLWorkbook(workbookStream);
-    var worksheet = workbook.Worksheets.First();
-
-    int headerRow = FindHeaderRow(worksheet, "Consultant");
-
-    if (headerRow == -1)
-        throw new Exception("Could not find Consultant header in Open Invoice Report.");
-
-    int consultantColumn = FindColumn(worksheet, headerRow, "Consultant");
-    int serviceEndColumn = FindColumn(worksheet, headerRow, "Service End");
-    int documentNumberColumn = FindColumn(worksheet, headerRow, "Document Number");
-    int remainingAmountColumn = FindColumn(worksheet, headerRow, "Remaining Amount");
-
-    if (consultantColumn == -1 || serviceEndColumn == -1 || documentNumberColumn == -1 || remainingAmountColumn == -1)
-        throw new Exception("Could not find Consultant, Service End, Document Number, or Remaining Amount in OIR.");
-
-    int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? headerRow;
-
-    for (int row = headerRow + 1; row <= lastRow; row++)
-    {
-        string consultant = worksheet.Cell(row, consultantColumn).GetString().Trim();
-        string serviceEnd = FormatWeekEndingDate(worksheet.Cell(row, serviceEndColumn));
-
-        if (string.IsNullOrWhiteSpace(consultant) || string.IsNullOrWhiteSpace(serviceEnd))
-            continue;
-
-        string concatKey = $"{consultant} {serviceEnd}".Trim();
-        string documentNumber = worksheet.Cell(row, documentNumberColumn).GetString().Trim();
-        decimal remainingAmount = GetDecimalValue(worksheet.Cell(row, remainingAmountColumn));
-
-        if (!matches.ContainsKey(concatKey))
-        {
-            matches.Add(concatKey, new OirMatch(documentNumber, remainingAmount));
-        }
-    }
-
-    return matches;
-}
 static string? PromptForFilePath(string prompt, int startLine)
 {
     Console.CursorVisible = true;
@@ -817,5 +766,4 @@ static int FindHeaderRow(IXLWorksheet worksheet, string requiredHeader)
     return -1;
 }
 
-// A record for a single OIR invoice mapping entry used during auto-matching (may expand upon if more columns are needed)
-record OirMatch(string DocumentNumber, decimal RemainingAmount);
+
