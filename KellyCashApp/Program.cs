@@ -2,6 +2,8 @@
 using KellyCashApp.Configuration;
 using KellyCashApp.Models;
 using KellyCashApp.Processors;
+using KellyCashApp.Processors.Monument;
+using KellyCashApp.Processors.Allegis;
 using KellyCashApp.Services;
 using KellyCashApp.Workflows;
 using System.Globalization;
@@ -28,6 +30,7 @@ Thread.Sleep(100);
 Console.WriteLine("A Week-Ending Line Total Aggregate Script");
 Console.WriteLine("──────────────────────────────────────────────────");
 var openInvoiceMatches = new Dictionary<string, OirMatch>();
+var openInvoiceMatchesMultiple = new Dictionary<string, List<OirMatch>>();
 
 string? inputPath = null;
 int defaultMenuOption = 0;
@@ -87,6 +90,7 @@ while (true)
         try
         {
             openInvoiceMatches = OirImporter.Load(oirPath);
+            openInvoiceMatchesMultiple = OirImporter.LoadMultiple(oirPath);
         }
         catch (Exception ex)
         {
@@ -203,6 +207,26 @@ while (true)
         else
         {
             worksheet = workbook.Worksheet(1);
+        }
+
+        if (MicrosoftPayment.IsMicrosoftFormat(worksheet))
+        {
+            string microsoftOutputPath = MicrosoftPayment.Process(workbook, worksheet, inputPath, openInvoiceMatchesMultiple);
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("Microsoft payment processed successfully.");
+            Console.WriteLine($"Updated file saved to: {microsoftOutputPath}");
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
         }
 
         // Conditional check for Johnson & Johnson payments (Re-Routing)

@@ -5,7 +5,7 @@ using KellyCashApp.Services;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace KellyCashApp.Processors
+namespace KellyCashApp.Processors.Monument
 {
     internal class MonumentPayment
     {

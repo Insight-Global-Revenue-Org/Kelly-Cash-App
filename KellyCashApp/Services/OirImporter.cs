@@ -97,6 +97,96 @@ namespace KellyCashApp.Services
             return matches;
         }
 
+        public static Dictionary<string, List<OirMatch>> LoadMultiple(string filePath)
+        {
+            var matches = new Dictionary<string, List<OirMatch>>(15000, StringComparer.OrdinalIgnoreCase);
+
+            using SpreadsheetDocument document = SpreadsheetDocument.Open(filePath, false);
+
+            WorkbookPart workbookPart = document.WorkbookPart
+                ?? throw new Exception("Could not read workbook.");
+
+            SharedStringTable? sharedStrings =
+                workbookPart.SharedStringTablePart?.SharedStringTable;
+
+            Sheet firstSheet = workbookPart.Workbook.Sheets!
+                .Elements<Sheet>()
+                .First();
+
+            WorksheetPart worksheetPart =
+                (WorksheetPart)workbookPart.GetPartById(firstSheet.Id!);
+
+            SheetData sheetData = worksheetPart.Worksheet.GetFirstChild<SheetData>()
+                ?? throw new Exception("Could not read worksheet data.");
+
+            int headerRowNumber = -1;
+            Dictionary<string, int> headers = new(StringComparer.OrdinalIgnoreCase);
+
+            foreach (Row row in sheetData.Elements<Row>())
+            {
+                int rowNumber = (int)row.RowIndex!.Value;
+
+                if (rowNumber > 25)
+                    break;
+
+                var rowValues = ReadRow(row, sharedStrings);
+
+                if (rowValues.Any(x => x.Value.Equals("Consultant", StringComparison.OrdinalIgnoreCase)))
+                {
+                    headerRowNumber = rowNumber;
+                    headers = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+                    foreach (var item in rowValues)
+                    {
+                        string header = item.Value.Trim();
+
+                        if (string.IsNullOrWhiteSpace(header))
+                            continue;
+
+                        if (!headers.ContainsKey(header))
+                            headers.Add(header, item.Key);
+                    }
+
+                    break;
+                }
+            }
+
+            if (headerRowNumber == -1)
+                throw new Exception("Could not find Consultant header in Open Invoice Report.");
+
+            int consultantColumn = GetRequiredColumn(headers, "Consultant");
+            int serviceEndColumn = GetRequiredColumn(headers, "Service End");
+            int documentNumberColumn = GetRequiredColumn(headers, "Document Number");
+            int remainingAmountColumn = GetRequiredColumn(headers, "Remaining Amount");
+
+            foreach (Row row in sheetData.Elements<Row>())
+            {
+                int rowNumber = (int)row.RowIndex!.Value;
+
+                if (rowNumber <= headerRowNumber)
+                    continue;
+
+                var rowValues = ReadRow(row, sharedStrings);
+
+                string consultant = GetValue(rowValues, consultantColumn).Trim();
+                string serviceEnd = FormatServiceEnd(GetValue(rowValues, serviceEndColumn));
+                string documentNumber = GetValue(rowValues, documentNumberColumn).Trim();
+                decimal remainingAmount = ParseDecimal(GetValue(rowValues, remainingAmountColumn));
+
+                if (string.IsNullOrWhiteSpace(consultant) || string.IsNullOrWhiteSpace(serviceEnd))
+                    continue;
+
+                string key = $"{consultant} {serviceEnd}".Trim();
+
+                if (!matches.ContainsKey(key))
+                    matches[key] = new List<OirMatch>();
+
+                matches[key].Add(new OirMatch(documentNumber, remainingAmount));
+            }
+
+            return matches;
+        }
+
         private static Dictionary<int, string> ReadRow(Row row, SharedStringTable? sharedStrings)
         {
             var values = new Dictionary<int, string>();
