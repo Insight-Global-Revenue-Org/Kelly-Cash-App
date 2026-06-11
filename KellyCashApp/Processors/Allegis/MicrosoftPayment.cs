@@ -26,7 +26,8 @@ namespace KellyCashApp.Processors.Allegis
             XLWorkbook workbook,
             IXLWorksheet worksheet,
             string inputPath,
-            Dictionary<string, List<OirMatch>> openInvoiceMatches)
+            Dictionary<string, List<OirMatch>> openInvoiceMatches,
+            Dictionary<string, List<MicrosoftVmsMatch>>? vmsMatches = null)
         {
             int microsoftInvoiceCol = FindColumn(worksheet, HeaderRow, "Consolidated Invoice ID");
             int workerCol = FindColumn(worksheet, HeaderRow, "Worker");
@@ -78,6 +79,16 @@ namespace KellyCashApp.Processors.Allegis
                 if (vmsIdentifier.Length > 5)
                     vmsIdentifier = vmsIdentifier[^5..];
 
+                string vmsLookupKey = $"{name}|{vmsIdentifier}";
+
+                MicrosoftVmsMatch? vmsMatch = null;
+
+                if (vmsMatches != null &&
+                    vmsMatches.TryGetValue(vmsLookupKey, out var foundVmsRows))
+                {
+                    vmsMatch = foundVmsRows.FirstOrDefault();
+                }
+
                 DateTime monthStart = new DateTime(
                     lineItemEndDate.Year,
                     lineItemEndDate.Month,
@@ -124,7 +135,12 @@ namespace KellyCashApp.Processors.Allegis
                             GroupId = groupId,
                             Concat = $"{name} {formattedLineItemEndDate}",
                             MicrosoftInvoice = microsoftInvoice,
-                            VmsIdentifier = vmsIdentifier
+                            VmsIdentifier = vmsIdentifier,
+                            AggregateInvoicedNet = vmsMatch?.AggregateInvoicedNet ?? 0,
+                            Hours = vmsMatch?.Hours ?? 0,
+                            RtRate = vmsMatch?.RtRate ?? 0,
+                            OtRate = vmsMatch?.OtRate ?? 0,
+                            DtRate = vmsMatch?.DtRate ?? 0
                         });
                     }
                 }
@@ -143,7 +159,12 @@ namespace KellyCashApp.Processors.Allegis
                         GroupId = groupId,
                         Concat = $"{name} {formattedLineItemEndDate}",
                         MicrosoftInvoice = microsoftInvoice,
-                        VmsIdentifier = vmsIdentifier
+                        VmsIdentifier = vmsIdentifier,
+                        AggregateInvoicedNet = vmsMatch?.AggregateInvoicedNet ?? 0,
+                        Hours = vmsMatch?.Hours ?? 0,
+                        RtRate = vmsMatch?.RtRate ?? 0,
+                        OtRate = vmsMatch?.OtRate ?? 0,
+                        DtRate = vmsMatch?.DtRate ?? 0
                     });
                 }
             }
@@ -175,7 +196,12 @@ namespace KellyCashApp.Processors.Allegis
                 "Notes",
                 "Concat",
                 "Microsoft Invoice",
-                "VMS Identifier"
+                "VMS Identifier",
+                "Invoiced Net",
+                "Hours",
+                "RT Rate",
+                "OT Rate",
+                "DT Rate"
             };
 
             for (int col = 1; col <= headers.Length; col++)
@@ -197,6 +223,11 @@ namespace KellyCashApp.Processors.Allegis
                 worksheet.Cell(row, 9).Value = item.Concat;
                 worksheet.Cell(row, 10).Value = item.MicrosoftInvoice;
                 worksheet.Cell(row, 11).Value = item.VmsIdentifier;
+                worksheet.Cell(row, 12).Value = item.AggregateInvoicedNet;
+                worksheet.Cell(row, 13).Value = item.Hours;
+                worksheet.Cell(row, 14).Value = item.RtRate;
+                worksheet.Cell(row, 15).Value = item.OtRate;
+                worksheet.Cell(row, 16).Value = item.DtRate;
 
                 worksheet.Row(row).AdjustToContents();
             }
@@ -213,9 +244,14 @@ namespace KellyCashApp.Processors.Allegis
                     worksheet.Range(firstOutputRow, 7, lastOutputRow, 7).Merge();
                     worksheet.Range(firstOutputRow, 10, lastOutputRow, 10).Merge();
                     worksheet.Range(firstOutputRow, 11, lastOutputRow, 11).Merge();
+                    worksheet.Range(firstOutputRow, 12, lastOutputRow, 12).Merge();
+                    worksheet.Range(firstOutputRow, 13, lastOutputRow, 13).Merge();
+                    worksheet.Range(firstOutputRow, 14, lastOutputRow, 14).Merge();
+                    worksheet.Range(firstOutputRow, 15, lastOutputRow, 15).Merge();
+                    worksheet.Range(firstOutputRow, 16, lastOutputRow, 16).Merge();
                 }
 
-                worksheet.Range(firstOutputRow, 1, lastOutputRow, 11)
+                worksheet.Range(firstOutputRow, 1, lastOutputRow, 16)
                     .Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
             }
 
@@ -307,6 +343,17 @@ namespace KellyCashApp.Processors.Allegis
             worksheet.Column(9).Width = 32;
             worksheet.Column(10).Width = 20;
             worksheet.Column(11).Width = 12;
+            worksheet.Column(12).Width = 12;
+            worksheet.Column(13).Width = 12;
+            worksheet.Column(14).Width = 12;
+            worksheet.Column(15).Width = 12;
+            worksheet.Column(16).Width = 12;
+
+            worksheet.Column(12).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
+            worksheet.Column(13).Style.NumberFormat.Format = "0.00";
+            worksheet.Column(14).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
+            worksheet.Column(15).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
+            worksheet.Column(16).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
 
             for (int row = 2; row <= lastRow; row++)
             {
@@ -316,7 +363,7 @@ namespace KellyCashApp.Processors.Allegis
                 {
                     worksheet.Cell(row, 5).Style.Font.FontColor = XLColor.Red;
 
-                    worksheet.Range(row, 1, row, 11)
+                    worksheet.Range(row, 1, row, 16)
                         .Style.Fill.BackgroundColor = XLColor.FromHtml("#F2F2F2");
                 }
             }
@@ -468,6 +515,11 @@ namespace KellyCashApp.Processors.Allegis
             public string Concat { get; set; } = "";
             public string MicrosoftInvoice { get; set; } = "";
             public string VmsIdentifier { get; set; } = "";
+            public decimal AggregateInvoicedNet { get; set; }
+            public decimal Hours { get; set; }
+            public decimal RtRate { get; set; }
+            public decimal OtRate { get; set; }
+            public decimal DtRate { get; set; }
         }
 
         private class OirLookupRow
