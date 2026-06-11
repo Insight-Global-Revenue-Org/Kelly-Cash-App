@@ -93,11 +93,16 @@ namespace KellyCashApp.Processors.Allegis
                     .OrderBy(x => x.WeekEndingDate)
                     .ToList();
 
+                bool matchedWithoutTax = false;
+
                 var matches = FindBestInvoiceCombination(possibleMatches, aggregateAmount);
 
                 if (!matches.Any() && tax != 0)
                 {
                     matches = FindBestInvoiceCombination(possibleMatches, preTaxAggregateAmount);
+
+                    if (matches.Any())
+                        matchedWithoutTax = true;
                 }
 
                 if (matches.Any())
@@ -113,7 +118,9 @@ namespace KellyCashApp.Processors.Allegis
                             InvoiceLineItemEndDate = formattedLineItemEndDate,
                             AggregateInvoiceLineItemAmount = aggregateAmount,
                             Tax = tax,
-                            Notes = "",
+                            Notes = matchedWithoutTax
+                                ? "Sales Tax was not included in Amount Due!"
+                                : "",
                             GroupId = groupId,
                             Concat = $"{name} {formattedLineItemEndDate}",
                             MicrosoftInvoice = microsoftInvoice,
@@ -295,7 +302,8 @@ namespace KellyCashApp.Processors.Allegis
             worksheet.Column(5).Width = 18;
             worksheet.Column(6).Width = 28;
             worksheet.Column(7).Width = 14;
-            worksheet.Column(8).Width = 24;
+            worksheet.Column(8).Width = 42;
+            worksheet.Column(8).Style.Alignment.WrapText = false;
             worksheet.Column(9).Width = 32;
             worksheet.Column(10).Width = 20;
             worksheet.Column(11).Width = 12;
