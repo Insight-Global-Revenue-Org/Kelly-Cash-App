@@ -64,9 +64,19 @@ namespace KellyCashApp.Processors.Allegis
                 groupId++;
                 string formattedLineItemEndDate = lineItemEndDate.ToString("MM/dd/yyyy");
 
+
                 decimal aggregateAmount = GetDecimalValue(worksheet.Cell(row, aggregateAmountCol));
                 decimal tax = GetDecimalValue(worksheet.Cell(row, taxCol));
+                decimal preTaxAggregateAmount = aggregateAmount - tax;
                 string microsoftInvoice = worksheet.Cell(row, microsoftInvoiceCol).GetString().Trim();
+
+                string vmsIdentifier =
+                    new string(microsoftInvoice
+                        .Where(char.IsDigit)
+                        .ToArray());
+
+                if (vmsIdentifier.Length > 5)
+                    vmsIdentifier = vmsIdentifier[^5..];
 
                 DateTime monthStart = new DateTime(
                     lineItemEndDate.Year,
@@ -85,6 +95,11 @@ namespace KellyCashApp.Processors.Allegis
 
                 var matches = FindBestInvoiceCombination(possibleMatches, aggregateAmount);
 
+                if (!matches.Any() && tax != 0)
+                {
+                    matches = FindBestInvoiceCombination(possibleMatches, preTaxAggregateAmount);
+                }
+
                 if (matches.Any())
                 {
                     foreach (var match in matches)
@@ -101,7 +116,8 @@ namespace KellyCashApp.Processors.Allegis
                             Notes = "",
                             GroupId = groupId,
                             Concat = $"{name} {formattedLineItemEndDate}",
-                            MicrosoftInvoice = microsoftInvoice
+                            MicrosoftInvoice = microsoftInvoice,
+                            VmsIdentifier = vmsIdentifier
                         });
                     }
                 }
@@ -119,7 +135,8 @@ namespace KellyCashApp.Processors.Allegis
                         Notes = "",
                         GroupId = groupId,
                         Concat = $"{name} {formattedLineItemEndDate}",
-                        MicrosoftInvoice = microsoftInvoice
+                        MicrosoftInvoice = microsoftInvoice,
+                        VmsIdentifier = vmsIdentifier
                     });
                 }
             }
@@ -140,18 +157,19 @@ namespace KellyCashApp.Processors.Allegis
             worksheet.Style.Fill.SetBackgroundColor(XLColor.NoColor);
 
             string[] headers =
-                 {
-                    "Invoice Line Item End Date",
-                    "Week Ending Date",
-                    "Name",
-                    "Invoice",
-                    "Amount Due",
-                    "Aggregate Paid",
-                    "Tax",
-                    "Notes",
-                    "Concat",
-                    "Microsoft Invoice"
-                };
+            {
+                "Invoice Line Item End Date",
+                "Week Ending Date",
+                "Name",
+                "Invoice",
+                "Amount Due",
+                "Aggregate Paid",
+                "Tax",
+                "Notes",
+                "Concat",
+                "Microsoft Invoice",
+                "VMS Identifier"
+            };
 
             for (int col = 1; col <= headers.Length; col++)
                 worksheet.Cell(1, col).Value = headers[col - 1];
@@ -171,6 +189,7 @@ namespace KellyCashApp.Processors.Allegis
                 worksheet.Cell(row, 8).Value = item.Notes;
                 worksheet.Cell(row, 9).Value = item.Concat;
                 worksheet.Cell(row, 10).Value = item.MicrosoftInvoice;
+                worksheet.Cell(row, 11).Value = item.VmsIdentifier;
 
                 worksheet.Row(row).AdjustToContents();
             }
@@ -186,9 +205,10 @@ namespace KellyCashApp.Processors.Allegis
                     worksheet.Range(firstOutputRow, 6, lastOutputRow, 6).Merge();
                     worksheet.Range(firstOutputRow, 7, lastOutputRow, 7).Merge();
                     worksheet.Range(firstOutputRow, 10, lastOutputRow, 10).Merge();
+                    worksheet.Range(firstOutputRow, 11, lastOutputRow, 11).Merge();
                 }
 
-                worksheet.Range(firstOutputRow, 1, lastOutputRow, 10)
+                worksheet.Range(firstOutputRow, 1, lastOutputRow, 11)
                     .Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
             }
 
@@ -278,6 +298,7 @@ namespace KellyCashApp.Processors.Allegis
             worksheet.Column(8).Width = 24;
             worksheet.Column(9).Width = 32;
             worksheet.Column(10).Width = 20;
+            worksheet.Column(11).Width = 12;
 
             for (int row = 2; row <= lastRow; row++)
             {
@@ -287,7 +308,7 @@ namespace KellyCashApp.Processors.Allegis
                 {
                     worksheet.Cell(row, 5).Style.Font.FontColor = XLColor.Red;
 
-                    worksheet.Range(row, 1, row, 10)
+                    worksheet.Range(row, 1, row, 11)
                         .Style.Fill.BackgroundColor = XLColor.FromHtml("#F2F2F2");
                 }
             }
@@ -438,6 +459,7 @@ namespace KellyCashApp.Processors.Allegis
             public int GroupId { get; set; }
             public string Concat { get; set; } = "";
             public string MicrosoftInvoice { get; set; } = "";
+            public string VmsIdentifier { get; set; } = "";
         }
 
         private class OirLookupRow
