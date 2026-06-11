@@ -97,7 +97,7 @@ namespace KellyCashApp.Services
                 .Reverse()
                 .ToArray();
 
-            int pageSize = 15;
+            int pageSize = 6;
             int page = 0;
             int totalPages = Math.Max(1, (int)Math.Ceiling(lines.Length / (double)pageSize));
 
