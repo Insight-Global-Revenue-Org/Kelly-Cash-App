@@ -31,6 +31,7 @@ Console.WriteLine("A Week-Ending Line Total Aggregate Script");
 Console.WriteLine("──────────────────────────────────────────────────");
 var openInvoiceMatches = new Dictionary<string, OirMatch>();
 var openInvoiceMatchesMultiple = new Dictionary<string, List<OirMatch>>();
+Dictionary<string, List<MicrosoftVmsMatch>>? microsoftVmsMatches = null;
 
 string? inputPath = null;
 int defaultMenuOption = 0;
@@ -209,9 +210,93 @@ while (true)
             worksheet = workbook.Worksheet(1);
         }
 
+        // Conditional check for Allegis payments (Re-Routing)
         if (MicrosoftPayment.IsMicrosoftFormat(worksheet))
         {
-            string microsoftOutputPath = MicrosoftPayment.Process(workbook, worksheet, inputPath, openInvoiceMatchesMultiple);
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            if (microsoftVmsMatches == null)
+            {
+                Console.WriteLine("Import VMS Timesheet Report? (Yes/No)");
+                Console.Write("> ");
+
+                string answer = Console.ReadLine()?.Trim() ?? "";
+
+                if (answer.Equals("Yes", StringComparison.OrdinalIgnoreCase) ||
+                    answer.Equals("Y", StringComparison.OrdinalIgnoreCase))
+                {
+                    string? vmsPath = FileSelector.SelectFile(
+                        "Paste the full file path of the Microsoft VMS Timesheet Report:",
+                        promptTop
+                    );
+
+                    if (string.IsNullOrWhiteSpace(vmsPath) || !File.Exists(vmsPath))
+                    {
+                        ClearArea(promptTop, 6);
+                        Console.SetCursorPosition(0, promptTop);
+                        Console.WriteLine("VMS file not found. Microsoft payment was not processed.");
+                        Console.WriteLine("Press any key to return to the menu...");
+                        Console.ReadKey(true);
+
+                        defaultMenuOption = 1;
+                        continue;
+                    }
+
+                    bool vmsLoading = true;
+
+                    Task vmsSpinner = Task.Run(() =>
+                    {
+                        char[] frames = { '/', '-', '\\', '|' };
+                        int i = 0;
+
+                        while (vmsLoading)
+                        {
+                            Console.SetCursorPosition(0, promptTop);
+                            Console.Write($"Importing VMS Report... {frames[i++ % frames.Length]}   ");
+                            Thread.Sleep(120);
+                        }
+                    });
+
+                    try
+                    {
+                        microsoftVmsMatches = MicrosoftVms.Import(vmsPath);
+                    }
+                    finally
+                    {
+                        vmsLoading = false;
+                        vmsSpinner.Wait();
+
+                        ClearArea(promptTop, 8);
+                    }
+                }
+            }
+
+            loading = true;
+
+            spinner = Task.Run(() =>
+            {
+                char[] frames = { '/', '-', '\\', '|' };
+                int i = 0;
+
+                while (loading)
+                {
+                    Console.SetCursorPosition(0, promptTop);
+                    Console.Write($"Processing Microsoft payment file... {frames[i++ % frames.Length]}   ");
+                    Thread.Sleep(120);
+                }
+            });
+
+            string microsoftOutputPath = MicrosoftPayment.Process(
+                workbook,
+                worksheet,
+                inputPath,
+                openInvoiceMatchesMultiple,
+                microsoftVmsMatches
+            );
 
             loading = false;
             spinner.Wait();
@@ -219,7 +304,10 @@ while (true)
             ClearArea(promptTop, 8);
             Console.SetCursorPosition(0, promptTop);
 
-            Console.WriteLine("Microsoft payment processed successfully.");
+            Console.WriteLine(microsoftVmsMatches == null
+                ? "Microsoft payment processed successfully."
+                : "Microsoft payment processed successfully with VMS report.");
+
             Console.WriteLine($"Updated file saved to: {microsoftOutputPath}");
             Console.WriteLine();
             Console.WriteLine("Press any key to return to the menu...");
