@@ -463,7 +463,7 @@ namespace KellyCashApp.Workflows
             Console.WriteLine("Likely applied / closed out:");
             Console.WriteLine();
 
-            int maxToShow = Math.Min(fallenOffInvoices.Count, 15);
+            int maxToShow = Math.Min(fallenOffInvoices.Count, 6);
 
             for (int i = 0; i < maxToShow; i++)
             {
