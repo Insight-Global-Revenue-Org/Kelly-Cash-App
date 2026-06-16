@@ -123,9 +123,19 @@ namespace KellyCashApp.Workflows
             using var workbook = new XLWorkbook(stream);
             var worksheet = workbook.Worksheets.First();
 
-            worksheet.Rows(1, 2).Delete();
+            int headerRow = FindHeaderRow(worksheet, "Consultant");
 
-            int headerRow = 1;
+            if (headerRow == -1)
+            {
+                throw new Exception("Could not locate header row (Consultant not found).");
+            }
+
+            // If header is BELOW row 1, clean up rows above it
+            if (headerRow > 1)
+            {
+                worksheet.Rows(1, headerRow - 1).Delete();
+                headerRow = 1;
+            }
 
             DeleteColumnIfExists(worksheet, headerRow, "A/R Rep");
 
@@ -453,7 +463,7 @@ namespace KellyCashApp.Workflows
             Console.WriteLine("Likely applied / closed out:");
             Console.WriteLine();
 
-            int maxToShow = Math.Min(fallenOffInvoices.Count, 15);
+            int maxToShow = Math.Min(fallenOffInvoices.Count, 6);
 
             for (int i = 0; i < maxToShow; i++)
             {

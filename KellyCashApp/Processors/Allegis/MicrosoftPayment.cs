@@ -14,12 +14,26 @@ namespace KellyCashApp.Processors.Allegis
 
         public static bool IsMicrosoftFormat(IXLWorksheet worksheet)
         {
-            return worksheet.Cell(HeaderRow, 4).GetString().Trim()
-                .Equals("Consolidated Invoice ID", StringComparison.OrdinalIgnoreCase)
-                && worksheet.Cell(HeaderRow, 11).GetString().Trim()
-                .Equals("Worker", StringComparison.OrdinalIgnoreCase)
-                && worksheet.Cell(HeaderRow, 13).GetString().Trim()
-                .Equals("Invoice Line Item End Date", StringComparison.OrdinalIgnoreCase);
+            int customerCol = FindColumn(worksheet, HeaderRow, "Customer");
+
+            if (customerCol == -1)
+                return false;
+
+            int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? FirstDataRow;
+
+            for (int row = FirstDataRow; row <= lastRow; row++)
+            {
+                string customer = worksheet.Cell(row, customerCol).GetString().Trim();
+
+                if (string.IsNullOrWhiteSpace(customer))
+                    continue;
+
+                return customer.Equals(
+                    "MICROSOFT - USA",
+                    StringComparison.OrdinalIgnoreCase);
+            }
+
+            return false;
         }
 
         public static string Process(
