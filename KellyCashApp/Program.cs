@@ -4,6 +4,7 @@ using KellyCashApp.Models;
 using KellyCashApp.Processors;
 using KellyCashApp.Processors.Monument;
 using KellyCashApp.Processors.Allegis;
+using KellyCashApp.Processors.Randstad;
 using KellyCashApp.Services;
 using KellyCashApp.Workflows;
 using System.Globalization;
@@ -194,6 +195,29 @@ while (true)
 
     try
 {
+        if (RandstadPayment.IsRandstadFormat(inputPath))
+        {
+            string randstadOutputPath = RandstadPayment.Process(
+                inputPath,
+                openInvoiceMatches
+            );
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("Randstad payment processed successfully.");
+            Console.WriteLine($"Updated file saved to: {randstadOutputPath}");
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
         using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
         // Open remittance workbook using the installed ClosedXML dependency

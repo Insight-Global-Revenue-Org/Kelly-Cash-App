@@ -1,4 +1,5 @@
-﻿using System.Windows.Forms;
+﻿using System.Drawing;
+using System.Windows.Forms;
 using KellyCashApp.Configuration;
 
 namespace KellyCashApp.Services
@@ -31,13 +32,25 @@ namespace KellyCashApp.Services
 
             Thread thread = new Thread(() =>
             {
+                using Form owner = new Form();
+
+                owner.TopMost = true;
+                owner.ShowInTaskbar = false;
+                owner.StartPosition = FormStartPosition.Manual;
+                owner.Location = new Point(-32000, -32000);
+                owner.WindowState = FormWindowState.Minimized;
+
+                owner.Show();
+                owner.Activate();
+
                 using OpenFileDialog dialog = new OpenFileDialog();
 
                 dialog.Title = "Select File";
-                dialog.Filter = "Excel/Text Files|*.xlsx;*.xls;*.txt|All Files|*.*";
+                dialog.Filter = "Supported Files|*.xlsx;*.xls;*.txt;*.pdf|All Files|*.*";
                 dialog.InitialDirectory = _lastDirectory;
+                dialog.RestoreDirectory = true;
 
-                if (dialog.ShowDialog() == DialogResult.OK)
+                if (dialog.ShowDialog(owner) == DialogResult.OK)
                 {
                     selectedPath = dialog.FileName;
 
