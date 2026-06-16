@@ -7,12 +7,12 @@ using System.Text.RegularExpressions;
 
 namespace KellyCashApp.Processors.Allegis
 {
-    internal class MicrosoftPayment
+    internal class CushmanWakefieldPayment
     {
         private const int HeaderRow = 6;
         private const int FirstDataRow = 10;
 
-        public static bool IsMicrosoftFormat(IXLWorksheet worksheet)
+        public static bool IsCushmanWakefieldFormat(IXLWorksheet worksheet)
         {
             int customerCol = FindColumn(worksheet, HeaderRow, "Customer");
 
@@ -29,7 +29,7 @@ namespace KellyCashApp.Processors.Allegis
                     continue;
 
                 return customer.Equals(
-                    "MICROSOFT - USA",
+                    "C&W CW SERVICES - USA",
                     StringComparison.OrdinalIgnoreCase);
             }
 
@@ -37,11 +37,10 @@ namespace KellyCashApp.Processors.Allegis
         }
 
         public static string Process(
-            XLWorkbook workbook,
-            IXLWorksheet worksheet,
-            string inputPath,
-            Dictionary<string, List<OirMatch>> openInvoiceMatches,
-            Dictionary<string, List<MicrosoftVmsMatch>>? vmsMatches = null)
+                XLWorkbook workbook,
+                IXLWorksheet worksheet,
+                string inputPath,
+                Dictionary<string, List<OirMatch>> openInvoiceMatches)
         {
             int microsoftInvoiceCol = FindColumn(worksheet, HeaderRow, "Consolidated Invoice ID");
             int workerCol = FindColumn(worksheet, HeaderRow, "Worker");
@@ -56,7 +55,7 @@ namespace KellyCashApp.Processors.Allegis
 
             int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? FirstDataRow;
 
-            var outputRows = new List<MicrosoftOutputRow>();
+            var outputRows = new List<CushmanWakefieldOutputRow>();
 
             int groupId = 0;
 
@@ -84,24 +83,6 @@ namespace KellyCashApp.Processors.Allegis
                 decimal tax = GetDecimalValue(worksheet.Cell(row, taxCol));
                 decimal preTaxAggregateAmount = aggregateAmount - tax;
                 string microsoftInvoice = worksheet.Cell(row, microsoftInvoiceCol).GetString().Trim();
-
-                string vmsIdentifier =
-                    new string(microsoftInvoice
-                        .Where(char.IsDigit)
-                        .ToArray());
-
-                if (vmsIdentifier.Length > 5)
-                    vmsIdentifier = vmsIdentifier[^5..];
-
-                string vmsLookupKey = $"{name}|{vmsIdentifier}";
-
-                MicrosoftVmsMatch? vmsMatch = null;
-
-                if (vmsMatches != null &&
-                    vmsMatches.TryGetValue(vmsLookupKey, out var foundVmsRows))
-                {
-                    vmsMatch = foundVmsRows.FirstOrDefault();
-                }
 
                 DateTime monthStart = new DateTime(
                     lineItemEndDate.Year,
@@ -134,7 +115,7 @@ namespace KellyCashApp.Processors.Allegis
                 {
                     foreach (var match in matches)
                     {
-                        outputRows.Add(new MicrosoftOutputRow
+                        outputRows.Add(new CushmanWakefieldOutputRow
                         {
                             WeekEndingDate = match.WeekEndingDate.ToString("MM/dd/yyyy"),
                             Name = name,
@@ -148,19 +129,14 @@ namespace KellyCashApp.Processors.Allegis
                                 : "",
                             GroupId = groupId,
                             Concat = $"{name} {formattedLineItemEndDate}",
-                            MicrosoftInvoice = microsoftInvoice,
-                            VmsIdentifier = vmsIdentifier,
-                            AggregateInvoicedNet = vmsMatch?.AggregateInvoicedNet ?? 0,
-                            Hours = vmsMatch?.Hours ?? 0,
-                            RtRate = vmsMatch?.RtRate ?? 0,
-                            OtRate = vmsMatch?.OtRate ?? 0,
-                            DtRate = vmsMatch?.DtRate ?? 0
+                            CushmanWakefieldInvoice = microsoftInvoice
+
                         });
                     }
                 }
                 else
                 {
-                    outputRows.Add(new MicrosoftOutputRow
+                    outputRows.Add(new CushmanWakefieldOutputRow
                     {
                         WeekEndingDate = "",
                         Name = name,
@@ -172,13 +148,7 @@ namespace KellyCashApp.Processors.Allegis
                         Notes = "",
                         GroupId = groupId,
                         Concat = $"{name} {formattedLineItemEndDate}",
-                        MicrosoftInvoice = microsoftInvoice,
-                        VmsIdentifier = vmsIdentifier,
-                        AggregateInvoicedNet = vmsMatch?.AggregateInvoicedNet ?? 0,
-                        Hours = vmsMatch?.Hours ?? 0,
-                        RtRate = vmsMatch?.RtRate ?? 0,
-                        OtRate = vmsMatch?.OtRate ?? 0,
-                        DtRate = vmsMatch?.DtRate ?? 0
+                        CushmanWakefieldInvoice = microsoftInvoice
                     });
                 }
             }
@@ -201,7 +171,7 @@ namespace KellyCashApp.Processors.Allegis
             string[] headers =
             {
                 "Invoice Line Item End Date",
-                "Week Ending Date",
+                "W/E (If-Monthly)",
                 "Name",
                 "Invoice",
                 "Amount Due",
@@ -209,13 +179,7 @@ namespace KellyCashApp.Processors.Allegis
                 "Tax",
                 "Notes",
                 "Concat",
-                "Microsoft Invoice",
-                "VMS Identifier",
-                "Invoiced Net",
-                "Hours",
-                "RT Rate",
-                "OT Rate",
-                "DT Rate"
+                "Cushman & Wakefield Invoice"
             };
 
             for (int col = 1; col <= headers.Length; col++)
@@ -235,13 +199,7 @@ namespace KellyCashApp.Processors.Allegis
                 worksheet.Cell(row, 7).Value = item.Tax;
                 worksheet.Cell(row, 8).Value = item.Notes;
                 worksheet.Cell(row, 9).Value = item.Concat;
-                worksheet.Cell(row, 10).Value = item.MicrosoftInvoice;
-                worksheet.Cell(row, 11).Value = item.VmsIdentifier;
-                worksheet.Cell(row, 12).Value = item.AggregateInvoicedNet;
-                worksheet.Cell(row, 13).Value = item.Hours;
-                worksheet.Cell(row, 14).Value = item.RtRate;
-                worksheet.Cell(row, 15).Value = item.OtRate;
-                worksheet.Cell(row, 16).Value = item.DtRate;
+                worksheet.Cell(row, 10).Value = item.CushmanWakefieldInvoice;
 
                 worksheet.Row(row).AdjustToContents();
             }
@@ -273,15 +231,15 @@ namespace KellyCashApp.Processors.Allegis
 
             string downloadsPath = Settings.GetRemittanceSavePath();
 
-          
+
             string formattedTotal = total.ToString("$#,##0.00;($#,##0.00)", CultureInfo.InvariantCulture);
             string processedDate = DateTime.Now.ToString("M.d.yyyy", CultureInfo.InvariantCulture);
 
-            string outputPath = GetUniqueOutputPath(downloadsPath, $"Microsoft {processedDate} - {formattedTotal}.xlsx");
+            string outputPath = GetUniqueOutputPath(downloadsPath, $"Cushman Wakefield {processedDate} - {formattedTotal}.xlsx");
 
             workbook.SaveAs(outputPath);
 
-            Analytics.LogRemittanceRun($"Microsoft - {formattedTotal}");
+            Analytics.LogRemittanceRun($"Cushman Wakefield - {formattedTotal}");
 
             return outputPath;
         }
@@ -515,7 +473,7 @@ namespace KellyCashApp.Processors.Allegis
             return path;
         }
 
-        private class MicrosoftOutputRow
+        private class CushmanWakefieldOutputRow
         {
             public string WeekEndingDate { get; set; } = "";
             public string Name { get; set; } = "";
@@ -527,13 +485,8 @@ namespace KellyCashApp.Processors.Allegis
             public string InvoiceLineItemEndDate { get; set; } = "";
             public int GroupId { get; set; }
             public string Concat { get; set; } = "";
-            public string MicrosoftInvoice { get; set; } = "";
-            public string VmsIdentifier { get; set; } = "";
-            public decimal AggregateInvoicedNet { get; set; }
-            public decimal Hours { get; set; }
-            public decimal RtRate { get; set; }
-            public decimal OtRate { get; set; }
-            public decimal DtRate { get; set; }
+            public string CushmanWakefieldInvoice { get; set; } = "";
+
         }
 
         private class OirLookupRow
