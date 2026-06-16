@@ -32,6 +32,7 @@ Console.WriteLine("────────────────────�
 var openInvoiceMatches = new Dictionary<string, OirMatch>();
 var openInvoiceMatchesMultiple = new Dictionary<string, List<OirMatch>>();
 Dictionary<string, List<MicrosoftVmsMatch>>? microsoftVmsMatches = null;
+bool skipMicrosoftVmsPrompt = false;
 
 string? inputPath = null;
 int defaultMenuOption = 0;
@@ -209,8 +210,8 @@ while (true)
         {
             worksheet = workbook.Worksheet(1);
         }
-
-        // Conditional check for Allegis payments (Re-Routing)
+        // -------- Main Conditional loop for all Allegis Payments! --------
+        // Conditional check for Microsoft payments (Re-Routing)
         if (MicrosoftPayment.IsMicrosoftFormat(worksheet))
         {
             loading = false;
@@ -219,12 +220,18 @@ while (true)
             ClearArea(promptTop, 8);
             Console.SetCursorPosition(0, promptTop);
 
-            if (microsoftVmsMatches == null)
+            if (microsoftVmsMatches == null && !skipMicrosoftVmsPrompt)
             {
                 Console.WriteLine("Import VMS Timesheet Report? (Yes/No)");
                 Console.Write("> ");
 
                 string answer = Console.ReadLine()?.Trim() ?? "";
+
+                if (answer.Equals("No", StringComparison.OrdinalIgnoreCase) ||
+                    answer.Equals("N", StringComparison.OrdinalIgnoreCase))
+                {
+                    skipMicrosoftVmsPrompt = true;
+                }
 
                 if (answer.Equals("Yes", StringComparison.OrdinalIgnoreCase) ||
                     answer.Equals("Y", StringComparison.OrdinalIgnoreCase))
@@ -309,6 +316,84 @@ while (true)
                 : "Microsoft payment processed successfully with VMS report.");
 
             Console.WriteLine($"Updated file saved to: {microsoftOutputPath}");
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
+        // Conditional check for CDW payments (Re-Routing)
+        if (CDWPayment.IsCDWFormat(worksheet))
+        {
+            string cdwOutputPath = CDWPayment.Process(
+                workbook,
+                worksheet,
+                inputPath,
+                openInvoiceMatchesMultiple
+            );
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("CDW payment processed successfully.");
+            Console.WriteLine($"Updated file saved to: {cdwOutputPath}");
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
+        // Conditional check for Samsung payments (Re-Routing)
+        if (SamsungPayment.IsSamsungFormat(worksheet))
+        {
+            string samsungOutputPath = SamsungPayment.Process(
+                workbook,
+                worksheet,
+                inputPath,
+                openInvoiceMatchesMultiple
+            );
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("Samsung payment processed successfully.");
+            Console.WriteLine($"Updated file saved to: {samsungOutputPath}");
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
+        // Conditional check for Cushman & Wakefield payments (Re-Routing)
+        if (CushmanWakefieldPayment.IsCushmanWakefieldFormat(worksheet))
+        {
+            string cushmanWakefieldOutputPath = CushmanWakefieldPayment.Process(
+                workbook,
+                worksheet,
+                inputPath,
+                openInvoiceMatchesMultiple
+            );
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("Cushman Wakefield payment processed successfully.");
+            Console.WriteLine($"Updated file saved to: {cushmanWakefieldOutputPath}");
             Console.WriteLine();
             Console.WriteLine("Press any key to return to the menu...");
             Console.ReadKey(true);
