@@ -29,10 +29,12 @@ namespace KellyCashApp.Processors.Randstad
             {
                 string text = page.Text;
 
+                string amountPattern = @"(?:-?\s*\$?[\d,]+\.\d{2}|\(\s*\$?[\d,]+\.\d{2}\s*\))";
+
                 var matches = Regex.Matches(
                     text,
-                    @"Other\s+(?<invoice>\d+)\s+(?<date>\d{1,2}/\d{1,2}/\d{2,4})\s+(?<name>.+?)\s+(?<gross>[\d,]+\.\d{2})\s+(?<paid>[\d,]+\.\d{2})(?=\s*Other\s+\d+|\s*Deposit Totals|$)"
-                );
+                    $@"Other\s+(?<invoice>\d+)\s+(?<date>\d{{1,2}}/\d{{1,2}}/\d{{2,4}})\s+(?<name>.+?)\s+(?<gross>{amountPattern})(?:\s+(?<discount>{amountPattern}))?\s+(?<paid>{amountPattern})(?=\s*Other\s+\d+|\s*Deposit Totals|$)");
+
 
                 foreach (Match match in matches)
                 {
@@ -46,7 +48,7 @@ namespace KellyCashApp.Processors.Randstad
                     string invoice = "";
                     decimal amountDue = 0;
 
-                    if (openInvoiceMatches.TryGetValue(concat, out OirMatch oirMatch))
+                    if (TryMatchWithDateTolerance(name, formattedDate, openInvoiceMatches, out OirMatch oirMatch))
                     {
                         invoice = oirMatch.DocumentNumber;
                         amountDue = oirMatch.RemainingAmount;
@@ -183,6 +185,44 @@ namespace KellyCashApp.Processors.Randstad
             return $"{first} {last}".Trim();
         }
 
+        private static bool TryMatchWithDateTolerance(
+            string name,
+            string formattedDate,
+            Dictionary<string, OirMatch> openInvoiceMatches,
+            out OirMatch match)
+        {
+            match = null;
+
+            if (!DateTime.TryParse(formattedDate, out DateTime baseDate))
+                return false;
+
+            // Primary Loop for non-exact OIR index matches
+            string exactKey = $"{name} {baseDate:MM/dd/yyyy}";
+            if (openInvoiceMatches.TryGetValue(exactKey, out match))
+                return true;
+
+           
+            string minusOne = $"{name} {baseDate.AddDays(-1):MM/dd/yyyy}";
+            if (openInvoiceMatches.TryGetValue(minusOne, out match))
+                return true;
+
+           
+            string plusOne = $"{name} {baseDate.AddDays(1):MM/dd/yyyy}";
+            if (openInvoiceMatches.TryGetValue(plusOne, out match))
+                return true;
+
+            string plusTwo = $"{name} {baseDate.AddDays(2):MM/dd/yyyy}";
+            if (openInvoiceMatches.TryGetValue(plusTwo, out match))
+                return true;
+
+            string minusTwo = $"{name} {baseDate.AddDays(-2):MM/dd/yyyy}";
+            if (openInvoiceMatches.TryGetValue(minusTwo, out match))
+                return true;
+
+
+            return false;
+        }
+
         private static string ToTitle(string value)
         {
             return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value.ToLower());
@@ -194,6 +234,7 @@ namespace KellyCashApp.Processors.Randstad
 
             if (decimal.TryParse(raw, NumberStyles.Any, CultureInfo.InvariantCulture, out decimal result))
                 return result;
+
 
             return 0;
         }
