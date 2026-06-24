@@ -23,19 +23,23 @@ namespace KellyCashApp.Processors.Randstad
         {
             var outputRows = new List<RandstadOutputRow>();
 
+            // Open using PDF Library
             using PdfDocument document = PdfDocument.Open(inputPath);
 
+            // Small loop through each page
             foreach (var page in document.GetPages())
             {
+                // Extract all plain text from the PDF! Parsing logic is below
                 string text = page.Text;
 
                 string amountPattern = @"(?:-?\s*\$?[\d,]+\.\d{2}|\(\s*\$?[\d,]+\.\d{2}\s*\))";
 
+                // REGEX Parser
                 var matches = Regex.Matches(
                     text,
                     $@"Other\s+(?<invoice>\d+)\s+(?<date>\d{{1,2}}/\d{{1,2}}/\d{{2,4}})\s+(?<name>.+?)\s+(?<gross>{amountPattern})(?:\s+(?<discount>{amountPattern}))?\s+(?<paid>{amountPattern})(?=\s*Other\s+\d+|\s*Deposit Totals|$)");
 
-
+                // And for each matched row, extract everything
                 foreach (Match match in matches)
                 {
                     string invoiceNumber = match.Groups["invoice"].Value.Trim();

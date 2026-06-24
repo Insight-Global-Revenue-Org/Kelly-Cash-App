@@ -609,12 +609,13 @@ while (true)
         {
             cell.Style.Font.FontColor = XLColor.Red;
         }
+            string formattedName = worksheet.Cell(targetRow, nameFormattedColumn).GetString().Trim();
+            string rawWeekEnding = worksheet.Cell(targetRow, weekEndingColumn).GetString().Trim();
+            string formattedWeekEnding = FormatWeekEndingDate(worksheet.Cell(targetRow, weekEndingColumn));
 
-        string concatValue = worksheet.Cell(targetRow, concatColumn).GetString().Trim();
-
-        // Auto-match our remittance entries against the users imported OIR invoice data.
-        if (openInvoiceMatches.TryGetValue(concatValue, out OirMatch match))
-        {
+            // Try matching with ±2 day spread
+            if (TryMatchWithDateSpread(formattedName, formattedWeekEnding, openInvoiceMatches, out OirMatch match))
+            {
             worksheet.Cell(targetRow, invoiceColumn).Value = match.DocumentNumber;
             worksheet.Cell(targetRow, amountColumn).Value = match.RemainingAmount;
 
@@ -788,6 +789,34 @@ static string MakeSafeFileName(string fileName)
     }
 
     return fileName.Trim();
+}
+
+static bool TryMatchWithDateSpread(
+    string formattedName,
+    string formattedWeekEnding,
+    Dictionary<string, OirMatch> openInvoiceMatches,
+    out OirMatch match)
+{
+    match = null;
+
+    if (!DateTime.TryParse(formattedWeekEnding, out DateTime baseDate))
+        return false;
+
+    // Try exact, then ±1, ±2 days
+    for (int offset = -2; offset <= 2; offset++)
+    {
+        DateTime testDate = baseDate.AddDays(offset);
+        string testDateString = testDate.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+
+        string testKey = $"{formattedName} {testDateString}".Trim();
+
+        if (openInvoiceMatches.TryGetValue(testKey, out match))
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static string GetUniqueOutputPath(string folderPath, string fileName)
