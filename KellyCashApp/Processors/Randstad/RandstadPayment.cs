@@ -86,10 +86,6 @@ namespace KellyCashApp.Processors.Randstad
                                 invoice = bestOirMatch.DocumentNumber;
                                 amountDue = bestOirMatch.RemainingAmount;
                             }
-                            else
-                            {
-                                clientProject = "";
-                            }
                         }
                     }
 
