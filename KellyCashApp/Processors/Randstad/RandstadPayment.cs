@@ -139,8 +139,6 @@ namespace KellyCashApp.Processors.Randstad
                 worksheet.Cell(row, 10).Value = item.ClientProject;
             }
 
-            MergeGroupedAggregateCells(worksheet, outputRows);
-
             ApplyFormatting(worksheet, outputRows.Count + 1, headers.Length);
 
             string downloadsPath = Settings.GetRemittanceSavePath();
@@ -155,46 +153,6 @@ namespace KellyCashApp.Processors.Randstad
             Analytics.LogRemittanceRun($"Randstad - {formattedTotal}");
 
             return outputPath;
-        }
-
-        private static void MergeGroupedAggregateCells(
-                    IXLWorksheet worksheet,
-                    List<RandstadOutputRow> outputRows)
-        {
-            var groups = outputRows
-                .Select((row, index) => new
-                {
-                    Row = row,
-                    ExcelRow = index + 2
-                })
-                .Where(x =>
-                    !string.IsNullOrWhiteSpace(x.Row.Invoice) &&
-                    !string.IsNullOrWhiteSpace(x.Row.BeelineId))
-                .GroupBy(x => new
-                {
-                    x.Row.Invoice,
-                    x.Row.BeelineId,
-                    x.Row.ClientProject
-                });
-
-            foreach (var group in groups)
-            {
-                var items = group.OrderBy(x => x.ExcelRow).ToList();
-
-                if (items.Count <= 1)
-                    continue;
-
-                int firstRow = items.First().ExcelRow;
-                int lastRow = items.Last().ExcelRow;
-
-                decimal totalPaid = items.Sum(x => x.Row.AggregateAmountPaid);
-
-                var range = worksheet.Range(firstRow, 5, lastRow, 5);
-                range.Merge();
-
-                worksheet.Cell(firstRow, 5).Value = totalPaid;
-                worksheet.Cell(firstRow, 5).Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-            }
         }
 
         private static void ApplyGroupedSowMatching(
