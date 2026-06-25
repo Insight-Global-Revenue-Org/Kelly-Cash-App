@@ -20,6 +20,12 @@
         private static string NameChangeFilePathFile =>
             Path.Combine(SettingsFolder, "name-change-file-path.txt");
 
+        private static string MicrosoftVmsReportFilePathFile =>
+            Path.Combine(SettingsFolder, "microsoft-vms-report-file-path.txt");
+
+        private static string NikeTrackerBoardFilePathFile =>
+            Path.Combine(SettingsFolder, "nike-tracker-board-file-path.txt");
+
         private static string FileSelectionTypeFile =>
              Path.Combine(SettingsFolder, "file-selection-type.txt");
 
@@ -36,13 +42,14 @@
                 "Full Cash Save File Path",
                 "Remittance Payment Save File Path",
                 "Name Change File Path",
+                "Additional Reporting Support",
                 "File Selection Type",
                 "Back"
             }, 0, menuTop);
 
 
 
-                if (selected == 6)
+                if (selected == 7)
                     return;
 
                 int promptTop = menuTop;
@@ -94,10 +101,15 @@
 
                 if (selected == 5)
                 {
+                    ShowAdditionalReportingSupportMenu(promptTop);
+                }
+
+                if (selected == 6)
+                {
                     SaveFileSelectionType(promptTop);
                 }
 
-                ClearArea(promptTop, 12);
+                ClearArea(promptTop, 20);
             }
         }
 
@@ -127,6 +139,73 @@
             }
 
             return "";
+        }
+
+        public static string GetMicrosoftVmsReportFilePath()
+        {
+            if (File.Exists(MicrosoftVmsReportFilePathFile))
+            {
+                string savedPath = File.ReadAllText(MicrosoftVmsReportFilePathFile).Trim();
+
+                if (File.Exists(savedPath))
+                    return savedPath;
+            }
+
+            return "";
+        }
+
+        public static string GetNikeTrackerBoardFilePath()
+        {
+            if (File.Exists(NikeTrackerBoardFilePathFile))
+            {
+                string savedPath = File.ReadAllText(NikeTrackerBoardFilePathFile).Trim();
+
+                if (File.Exists(savedPath))
+                    return savedPath;
+            }
+
+            return "";
+        }
+
+        private static void ShowAdditionalReportingSupportMenu(int menuTop)
+        {
+            while (true)
+            {
+                ClearArea(menuTop, 20);
+
+                int selected = ShowMenu(new[]
+                {
+            "Microsoft VMS Report File Path",
+            "Nike Tracker Board File Path",
+            "Back"
+        }, 0, menuTop);
+
+                if (selected == 2)
+                    return;
+
+                ClearArea(menuTop, 10);
+                Console.SetCursorPosition(0, menuTop);
+
+                if (selected == 0)
+                {
+                    SaveFilePathSetting(
+                        "Paste the full Excel file path for the Microsoft VMS Report:",
+                        MicrosoftVmsReportFilePathFile,
+                        menuTop
+                    );
+                }
+
+                if (selected == 1)
+                {
+                    SaveFilePathSetting(
+                        "Paste the full Excel file path for the Nike Tracker Board:",
+                        NikeTrackerBoardFilePathFile,
+                        menuTop
+                    );
+                }
+
+                ClearArea(menuTop, 12);
+            }
         }
 
         public static string GetFileSelectionType()
@@ -187,6 +266,14 @@
 
             Console.WriteLine("Name Change File Path:");
             Console.WriteLine(string.IsNullOrWhiteSpace(GetNameChangeFilePath()) ? "Not set yet" : GetNameChangeFilePath());
+            Console.WriteLine();
+
+            Console.WriteLine("Microsoft VMS Report File Path:");
+            Console.WriteLine(string.IsNullOrWhiteSpace(GetMicrosoftVmsReportFilePath()) ? "Not set yet" : GetMicrosoftVmsReportFilePath());
+            Console.WriteLine();
+
+            Console.WriteLine("Nike Tracker Board File Path:");
+            Console.WriteLine(string.IsNullOrWhiteSpace(GetNikeTrackerBoardFilePath()) ? "Not set yet" : GetNikeTrackerBoardFilePath());
             Console.WriteLine();
 
             Console.WriteLine("Press any key to return...");

@@ -18,10 +18,13 @@ namespace KellyCashApp.Processors.Randstad
         }
 
         public static string Process(
-            string inputPath,
-            Dictionary<string, OirMatch> openInvoiceMatches)
+                string inputPath,
+                 Dictionary<string, OirMatch> openInvoiceMatches,
+                 Dictionary<string, List<OirMatch>> openInvoiceMatchesByClientProject)
         {
             var outputRows = new List<RandstadOutputRow>();
+
+            string nikeTrackerPath = Settings.GetNikeTrackerBoardFilePath();
 
             // Open using PDF Library
             using PdfDocument document = PdfDocument.Open(inputPath);
@@ -57,6 +60,28 @@ namespace KellyCashApp.Processors.Randstad
                     {
                         invoice = oirMatch.DocumentNumber;
                         amountDue = oirMatch.RemainingAmount;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(beelineId) &&
+                    !string.IsNullOrWhiteSpace(nikeTrackerPath))
+                    {
+                        NikeTrackerMatch? nikeMatch = NikeTracker.FindBestMatch(
+                            nikeTrackerPath,
+                            beelineId,
+                            formattedDate,
+                            paidAmount
+                        );
+
+                        if (nikeMatch != null &&
+                            openInvoiceMatchesByClientProject.TryGetValue(nikeMatch.ClientProjectName, out List<OirMatch>? projectMatches))
+                        {
+                            OirMatch bestOirMatch = projectMatches
+                                .OrderBy(x => Math.Abs(x.RemainingAmount - nikeMatch.BeelineAmount))
+                                .First();
+
+                            invoice = bestOirMatch.DocumentNumber;
+                            amountDue = bestOirMatch.RemainingAmount;
+                        }
                     }
 
                     outputRows.Add(new RandstadOutputRow

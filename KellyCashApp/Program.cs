@@ -32,6 +32,7 @@ Console.WriteLine("A Week-Ending Line Total Aggregate Script");
 Console.WriteLine("──────────────────────────────────────────────────");
 var openInvoiceMatches = new Dictionary<string, OirMatch>();
 var openInvoiceMatchesMultiple = new Dictionary<string, List<OirMatch>>();
+var openInvoiceMatchesByClientProject = new Dictionary<string, List<OirMatch>>();
 Dictionary<string, List<MicrosoftVmsMatch>>? microsoftVmsMatches = null;
 bool skipMicrosoftVmsPrompt = false;
 
@@ -94,6 +95,7 @@ while (true)
         {
             openInvoiceMatches = OirImporter.Load(oirPath);
             openInvoiceMatchesMultiple = OirImporter.LoadMultiple(oirPath);
+            openInvoiceMatchesByClientProject = OirImporter.LoadByClientProject(oirPath);
         }
         catch (Exception ex)
         {
@@ -199,7 +201,8 @@ while (true)
         {
             string randstadOutputPath = RandstadPayment.Process(
                 inputPath,
-                openInvoiceMatches
+                openInvoiceMatches,
+                openInvoiceMatchesByClientProject
             );
 
             loading = false;
