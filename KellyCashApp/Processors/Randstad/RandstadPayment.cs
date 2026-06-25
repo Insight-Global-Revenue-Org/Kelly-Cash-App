@@ -55,6 +55,7 @@ namespace KellyCashApp.Processors.Randstad
 
                     string invoice = "";
                     decimal amountDue = 0;
+                    string clientProject = "";
 
                     if (TryMatchWithDateTolerance(name, formattedDate, openInvoiceMatches, out OirMatch oirMatch))
                     {
@@ -75,6 +76,7 @@ namespace KellyCashApp.Processors.Randstad
                         if (nikeMatch != null &&
                             openInvoiceMatchesByClientProject.TryGetValue(nikeMatch.ClientProjectName, out List<OirMatch>? projectMatches))
                         {
+                            clientProject = nikeMatch.ClientProjectName;
                             OirMatch bestOirMatch = projectMatches
                                 .OrderBy(x => Math.Abs(x.RemainingAmount - nikeMatch.BeelineAmount))
                                 .First();
@@ -94,7 +96,8 @@ namespace KellyCashApp.Processors.Randstad
                         Notes = "",
                         Concat = concat,
                         InvoiceNumber = invoiceNumber,
-                        BeelineId = beelineId
+                        BeelineId = beelineId,
+                        ClientProject = clientProject
                     });
                 }
             }
@@ -112,7 +115,8 @@ namespace KellyCashApp.Processors.Randstad
                 "Notes",
                 "Concat",
                 "Invoice Number",
-                "Beeline ID"
+                "Beeline ID",
+                "Client Project"
             };
 
             for (int col = 1; col <= headers.Length; col++)
@@ -132,6 +136,7 @@ namespace KellyCashApp.Processors.Randstad
                 worksheet.Cell(row, 7).Value = item.Concat;
                 worksheet.Cell(row, 8).Value = item.InvoiceNumber;
                 worksheet.Cell(row, 9).Value = item.BeelineId;
+                worksheet.Cell(row, 10).Value = item.ClientProject;
             }
 
             ApplyFormatting(worksheet, outputRows.Count + 1, headers.Length);
@@ -310,6 +315,7 @@ namespace KellyCashApp.Processors.Randstad
             public string Concat { get; set; } = "";
             public string InvoiceNumber { get; set; } = "";
             public string BeelineId { get; set; } = "";
+            public string ClientProject { get; set; } = "";
         }
     }
 }
