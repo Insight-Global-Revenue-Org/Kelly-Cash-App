@@ -78,11 +78,18 @@ namespace KellyCashApp.Processors.Randstad
                         {
                             clientProject = nikeMatch.ClientProjectName;
                             OirMatch bestOirMatch = projectMatches
-                                .OrderBy(x => Math.Abs(x.RemainingAmount - nikeMatch.BeelineAmount))
-                                .First();
+                            .OrderBy(x => Math.Abs(x.RemainingAmount - nikeMatch.BeelineAmount))
+                            .First();
 
-                            invoice = bestOirMatch.DocumentNumber;
-                            amountDue = bestOirMatch.RemainingAmount;
+                            if (IsWithinTenPercent(paidAmount, bestOirMatch.RemainingAmount))
+                            {
+                                invoice = bestOirMatch.DocumentNumber;
+                                amountDue = bestOirMatch.RemainingAmount;
+                            }
+                            else
+                            {
+                                clientProject = "";
+                            }
                         }
                     }
 
@@ -274,6 +281,18 @@ namespace KellyCashApp.Processors.Randstad
         private static string ToTitle(string value)
         {
             return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value.ToLower());
+        }
+
+        // maybe a temporary helper function to check if the paid amount is within 10% of the amount due
+        private static bool IsWithinTenPercent(decimal paidAmount, decimal amountDue)
+        {
+            if (amountDue == 0)
+                return false;
+
+            decimal difference = Math.Abs(paidAmount - amountDue);
+            decimal percentDifference = difference / Math.Abs(amountDue);
+
+            return percentDifference <= 0.10m;
         }
 
         private static decimal GetDecimalValue(string value)
