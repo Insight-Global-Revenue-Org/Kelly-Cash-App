@@ -154,6 +154,8 @@ namespace KellyCashApp.Processors.Randstad
      List<RandstadOutputRow> outputRows,
      Dictionary<string, List<OirMatch>> openInvoiceMatchesByClientProject)
         {
+            var usedInvoices = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             var sowGroups = outputRows
                 .Where(x =>
                     !string.IsNullOrWhiteSpace(x.BeelineId) &&
@@ -172,21 +174,20 @@ namespace KellyCashApp.Processors.Randstad
                 if (!openInvoiceMatchesByClientProject.TryGetValue(group.Key.ClientProject, out List<OirMatch>? projectMatches))
                     continue;
 
-                // First try the full group total at 10%
-                TryApplyMatch(rows, projectMatches, 0.10m);
+                TryApplyMatch(rows, projectMatches, usedInvoices, 0.10m);
 
-                // Then brute-force combinations of 2 and 3 at stricter 5%
                 foreach (var combo in GetCombinations(rows.Where(x => string.IsNullOrWhiteSpace(x.Invoice)).ToList(), 2))
-                    TryApplyMatch(combo, projectMatches, 0.05m);
+                    TryApplyMatch(combo, projectMatches, usedInvoices, 0.05m);
 
                 foreach (var combo in GetCombinations(rows.Where(x => string.IsNullOrWhiteSpace(x.Invoice)).ToList(), 3))
-                    TryApplyMatch(combo, projectMatches, 0.05m);
+                    TryApplyMatch(combo, projectMatches, usedInvoices, 0.05m);
             }
         }
 
         private static void TryApplyMatch(
     List<RandstadOutputRow> rows,
     List<OirMatch> projectMatches,
+    HashSet<string> usedInvoices,
     decimal allowedPercentDifference)
         {
             if (rows.Count == 0)
@@ -194,9 +195,13 @@ namespace KellyCashApp.Processors.Randstad
 
             decimal groupedPaidAmount = rows.Sum(x => x.AggregateAmountPaid);
 
-            OirMatch bestOirMatch = projectMatches
+            OirMatch? bestOirMatch = projectMatches
+                .Where(x => !usedInvoices.Contains(x.DocumentNumber))
                 .OrderBy(x => Math.Abs(x.RemainingAmount - groupedPaidAmount))
-                .First();
+                .FirstOrDefault();
+
+            if (bestOirMatch == null)
+                return;
 
             if (!IsWithinPercent(groupedPaidAmount, bestOirMatch.RemainingAmount, allowedPercentDifference))
                 return;
@@ -206,6 +211,8 @@ namespace KellyCashApp.Processors.Randstad
                 row.Invoice = bestOirMatch.DocumentNumber;
                 row.AmountDue = bestOirMatch.RemainingAmount;
             }
+
+            usedInvoices.Add(bestOirMatch.DocumentNumber);
         }
 
         private static List<List<T>> GetCombinations<T>(List<T> items, int size)
