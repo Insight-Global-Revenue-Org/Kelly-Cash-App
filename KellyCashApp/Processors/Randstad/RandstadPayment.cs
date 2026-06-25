@@ -181,6 +181,8 @@ namespace KellyCashApp.Processors.Randstad
 
                 foreach (var combo in GetCombinations(rows.Where(x => string.IsNullOrWhiteSpace(x.Invoice)).ToList(), 3))
                     TryApplyMatch(combo, projectMatches, usedInvoices, 0.05m);
+
+                TryApplyMatch(rows.Where(x => string.IsNullOrWhiteSpace(x.Invoice)).ToList(), projectMatches, usedInvoices, 0.10m);
             }
         }
 
