@@ -48,6 +48,7 @@ namespace KellyCashApp.Processors.Randstad
                     decimal paidAmount = GetDecimalValue(match.Groups["paid"].Value);
 
                     string concat = $"{name} {formattedDate}";
+                    string beelineId = GetBeelineId(name);
 
                     string invoice = "";
                     decimal amountDue = 0;
@@ -67,7 +68,8 @@ namespace KellyCashApp.Processors.Randstad
                         AggregateAmountPaid = paidAmount,
                         Notes = "",
                         Concat = concat,
-                        InvoiceNumber = invoiceNumber
+                        InvoiceNumber = invoiceNumber,
+                        BeelineId = beelineId
                     });
                 }
             }
@@ -84,7 +86,8 @@ namespace KellyCashApp.Processors.Randstad
                 "Aggregate Amount Paid",
                 "Notes",
                 "Concat",
-                "Invoice Number"
+                "Invoice Number",
+                "Beeline ID"
             };
 
             for (int col = 1; col <= headers.Length; col++)
@@ -103,6 +106,7 @@ namespace KellyCashApp.Processors.Randstad
                 worksheet.Cell(row, 6).Value = item.Notes;
                 worksheet.Cell(row, 7).Value = item.Concat;
                 worksheet.Cell(row, 8).Value = item.InvoiceNumber;
+                worksheet.Cell(row, 9).Value = item.BeelineId;
             }
 
             ApplyFormatting(worksheet, outputRows.Count + 1, headers.Length);
@@ -189,6 +193,16 @@ namespace KellyCashApp.Processors.Randstad
             return $"{first} {last}".Trim();
         }
 
+        private static string GetBeelineId(string name)
+        {
+            var match = Regex.Match(name, @"^(?<id>\d+)_\d+\s+Sow$", RegexOptions.IgnoreCase);
+
+            if (match.Success)
+                return match.Groups["id"].Value;
+
+            return "";
+        }
+
         private static bool TryMatchWithDateTolerance(
             string name,
             string formattedDate,
@@ -270,6 +284,7 @@ namespace KellyCashApp.Processors.Randstad
             public string Notes { get; set; } = "";
             public string Concat { get; set; } = "";
             public string InvoiceNumber { get; set; } = "";
+            public string BeelineId { get; set; } = "";
         }
     }
 }
