@@ -77,15 +77,6 @@ namespace KellyCashApp.Processors.Randstad
                             openInvoiceMatchesByClientProject.TryGetValue(nikeMatch.ClientProjectName, out List<OirMatch>? projectMatches))
                         {
                             clientProject = nikeMatch.ClientProjectName;
-                            OirMatch bestOirMatch = projectMatches
-                            .OrderBy(x => Math.Abs(x.RemainingAmount - nikeMatch.BeelineAmount))
-                            .First();
-
-                            if (IsWithinTenPercent(paidAmount, bestOirMatch.RemainingAmount))
-                            {
-                                invoice = bestOirMatch.DocumentNumber;
-                                amountDue = bestOirMatch.RemainingAmount;
-                            }
                         }
                     }
 
@@ -105,6 +96,7 @@ namespace KellyCashApp.Processors.Randstad
                 }
             }
 
+            ApplyGroupedSowMatching(outputRows, openInvoiceMatchesByClientProject);
             using var workbook = new XLWorkbook();
             var worksheet = workbook.Worksheets.Add("Randstad Payment");
 
@@ -156,6 +148,88 @@ namespace KellyCashApp.Processors.Randstad
             Analytics.LogRemittanceRun($"Randstad - {formattedTotal}");
 
             return outputPath;
+        }
+
+        private static void ApplyGroupedSowMatching(
+     List<RandstadOutputRow> outputRows,
+     Dictionary<string, List<OirMatch>> openInvoiceMatchesByClientProject)
+        {
+            var sowGroups = outputRows
+                .Where(x =>
+                    !string.IsNullOrWhiteSpace(x.BeelineId) &&
+                    !string.IsNullOrWhiteSpace(x.ClientProject) &&
+                    string.IsNullOrWhiteSpace(x.Invoice))
+                .GroupBy(x => new
+                {
+                    x.BeelineId,
+                    x.ClientProject
+                });
+
+            foreach (var group in sowGroups)
+            {
+                var rows = group.ToList();
+
+                if (!openInvoiceMatchesByClientProject.TryGetValue(group.Key.ClientProject, out List<OirMatch>? projectMatches))
+                    continue;
+
+                // First try the full group total at 10%
+                TryApplyMatch(rows, projectMatches, 0.10m);
+
+                // Then brute-force combinations of 2 and 3 at stricter 5%
+                foreach (var combo in GetCombinations(rows.Where(x => string.IsNullOrWhiteSpace(x.Invoice)).ToList(), 2))
+                    TryApplyMatch(combo, projectMatches, 0.05m);
+
+                foreach (var combo in GetCombinations(rows.Where(x => string.IsNullOrWhiteSpace(x.Invoice)).ToList(), 3))
+                    TryApplyMatch(combo, projectMatches, 0.05m);
+            }
+        }
+
+        private static void TryApplyMatch(
+    List<RandstadOutputRow> rows,
+    List<OirMatch> projectMatches,
+    decimal allowedPercentDifference)
+        {
+            if (rows.Count == 0)
+                return;
+
+            decimal groupedPaidAmount = rows.Sum(x => x.AggregateAmountPaid);
+
+            OirMatch bestOirMatch = projectMatches
+                .OrderBy(x => Math.Abs(x.RemainingAmount - groupedPaidAmount))
+                .First();
+
+            if (!IsWithinPercent(groupedPaidAmount, bestOirMatch.RemainingAmount, allowedPercentDifference))
+                return;
+
+            foreach (var row in rows)
+            {
+                row.Invoice = bestOirMatch.DocumentNumber;
+                row.AmountDue = bestOirMatch.RemainingAmount;
+            }
+        }
+
+        private static List<List<T>> GetCombinations<T>(List<T> items, int size)
+        {
+            var results = new List<List<T>>();
+
+            void Build(int start, List<T> current)
+            {
+                if (current.Count == size)
+                {
+                    results.Add(new List<T>(current));
+                    return;
+                }
+
+                for (int i = start; i < items.Count; i++)
+                {
+                    current.Add(items[i]);
+                    Build(i + 1, current);
+                    current.RemoveAt(current.Count - 1);
+                }
+            }
+
+            Build(0, new List<T>());
+            return results;
         }
 
         private static void ApplyFormatting(IXLWorksheet worksheet, int lastRow, int lastColumn)
@@ -280,7 +354,7 @@ namespace KellyCashApp.Processors.Randstad
         }
 
         // maybe a temporary helper function to check if the paid amount is within 10% of the amount due
-        private static bool IsWithinTenPercent(decimal paidAmount, decimal amountDue)
+        private static bool IsWithinPercent(decimal paidAmount, decimal amountDue, decimal allowedPercentDifference)
         {
             if (amountDue == 0)
                 return false;
@@ -288,7 +362,7 @@ namespace KellyCashApp.Processors.Randstad
             decimal difference = Math.Abs(paidAmount - amountDue);
             decimal percentDifference = difference / Math.Abs(amountDue);
 
-            return percentDifference <= 0.10m;
+            return percentDifference <= allowedPercentDifference;
         }
 
         private static decimal GetDecimalValue(string value)
