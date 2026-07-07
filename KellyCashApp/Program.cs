@@ -5,6 +5,7 @@ using KellyCashApp.Processors;
 using KellyCashApp.Processors.Monument;
 using KellyCashApp.Processors.Allegis;
 using KellyCashApp.Processors.Randstad;
+using KellyCashApp.Processors.Guidant;
 using KellyCashApp.Services;
 using KellyCashApp.Workflows;
 using System.Globalization;
@@ -432,6 +433,32 @@ while (true)
 
             Console.WriteLine("Johnson & Johnson fixed-fee payment processed successfully.");
             Console.WriteLine($"Updated file saved to: {jnjOutputPath}");
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
+        // Conditional check for Guidant payments (Re-Routing)
+        if (GuidantPayment.IsGuidantFormat(worksheet))
+        {
+            string guidantOutputPath = GuidantPayment.Process(
+                workbook,
+                worksheet,
+                inputPath,
+                openInvoiceMatches
+            );
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("Guidant payment processed successfully.");
+            Console.WriteLine($"Updated file saved to: {guidantOutputPath}");
             Console.WriteLine();
             Console.WriteLine("Press any key to return to the menu...");
             Console.ReadKey(true);
