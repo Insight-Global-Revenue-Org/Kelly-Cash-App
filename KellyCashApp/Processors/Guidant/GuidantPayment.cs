@@ -127,6 +127,12 @@ namespace KellyCashApp.Processors.Guidant
                 row.AggregateAmountPaid = totalsByConcat[row.Concat];
             }
 
+            // sort alphabetically :)
+            outputRows = outputRows
+                .OrderBy(r => r.Name)
+                .ThenBy(r => r.WeekEndingDate)
+                .ToList();
+
             worksheet.Clear();
 
             string[] headers =
@@ -138,12 +144,12 @@ namespace KellyCashApp.Processors.Guidant
                 "Aggregate Amount Paid",
                 "Notes",
                 "Concat",
+                "Hours Type",
                 "Guidant Invoice",
                 "Invoice ID",
                 "Timesheet ID",
-                "Hours Type",
                 "Bill Hours"
-                };
+            };
 
             for (int col = 1; col <= headers.Length; col++)
                 worksheet.Cell(1, col).Value = headers[col - 1];
@@ -163,10 +169,10 @@ namespace KellyCashApp.Processors.Guidant
                 worksheet.Cell(row, 5).Value = item.AggregateAmountPaid;
                 worksheet.Cell(row, 6).Value = item.Notes;
                 worksheet.Cell(row, 7).Value = item.Concat;
-                worksheet.Cell(row, 8).Value = item.GuidantInvoice;
-                worksheet.Cell(row, 9).Value = item.InvoiceId;
-                worksheet.Cell(row, 10).Value = item.TimesheetId;
-                worksheet.Cell(row, 11).Value = item.HoursType;
+                worksheet.Cell(row, 8).Value = item.HoursType;
+                worksheet.Cell(row, 9).Value = item.GuidantInvoice;
+                worksheet.Cell(row, 10).Value = item.InvoiceId;
+                worksheet.Cell(row, 11).Value = item.TimesheetId;
                 worksheet.Cell(row, 12).Value = item.BillHours;
             }
 
@@ -325,10 +331,10 @@ namespace KellyCashApp.Processors.Guidant
             }
 
             // Center identifier/helper columns
-            worksheet.Column(8).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;  // Guidant Invoice
-            worksheet.Column(9).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;  // Invoice ID
-            worksheet.Column(10).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center; // Timesheet ID
-            worksheet.Column(11).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center; // Hours Type
+            worksheet.Column(8).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;  // Hours Type
+            worksheet.Column(9).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;  // Guidant Invoice
+            worksheet.Column(10).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center; // Invoice ID
+            worksheet.Column(11).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center; // Timesheet ID
             worksheet.Column(12).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center; // Bill Hours
 
             // Freeze top row
@@ -342,10 +348,10 @@ namespace KellyCashApp.Processors.Guidant
             worksheet.Column(5).Width = 20;   // Aggregate Amount Paid
             worksheet.Column(6).Width = 22;   // Notes
             worksheet.Column(7).Width = 28;   // Concat
-            worksheet.Column(8).Width = 18;   // Guidant Invoice
-            worksheet.Column(9).Width = 18;   // Invoice ID
-            worksheet.Column(10).Width = 18;  // Timesheet ID
-            worksheet.Column(11).Width = 14;  // Hours Type
+            worksheet.Column(8).Width = 14;   // Hours Type
+            worksheet.Column(9).Width = 18;   // Guidant Invoice
+            worksheet.Column(10).Width = 18;  // Invoice ID
+            worksheet.Column(11).Width = 18;  // Timesheet ID
             worksheet.Column(12).Width = 12;  // Bill Hours
 
             // Filter
