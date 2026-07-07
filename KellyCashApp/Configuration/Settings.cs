@@ -33,7 +33,7 @@
         {
             while (true)
             {
-                ClearArea(menuTop, 30);
+                ConsoleUi.ResetPage(menuTop);
 
                 int selected = ShowMenu(new[]
             {
@@ -54,12 +54,12 @@
 
                 int promptTop = menuTop;
 
-                ClearArea(promptTop, 10);
+                ConsoleUi.ResetPage(promptTop);
                 Console.SetCursorPosition(0, promptTop);
 
                 if (selected == 0)
                 {
-                    ClearArea(menuTop, 30);
+                    ConsoleUi.ResetPage(promptTop);
                     ShowCurrentSettings(menuTop);
                 }
 
@@ -109,7 +109,7 @@
                     SaveFileSelectionType(promptTop);
                 }
 
-                ClearArea(promptTop, 20);
+                ConsoleUi.ResetPage(promptTop);
             }
         }
 
@@ -171,7 +171,7 @@
         {
             while (true)
             {
-                ClearArea(menuTop, 20);
+                ConsoleUi.ResetPage(menuTop);
 
                 int selected = ShowMenu(new[]
                 {
@@ -183,8 +183,7 @@
                 if (selected == 2)
                     return;
 
-                ClearArea(menuTop, 10);
-                Console.SetCursorPosition(0, menuTop);
+                ConsoleUi.ResetPage(menuTop);
 
                 if (selected == 0)
                 {
@@ -241,12 +240,19 @@
             Console.WriteLine();
             Console.WriteLine("Press any key to return...");
             Console.ReadKey(true);
+
+            // Reset the entire screen before returning
+            ConsoleUi.ResetPage(0);
+            ConsoleUi.DrawHeader();
         }
 
         private static void ShowCurrentSettings(int promptTop)
         {
-            ClearArea(promptTop, 12);
-            Console.SetCursorPosition(0, promptTop);
+            ConsoleUi.ResetPage(0);
+
+            int contentTop = ConsoleUi.DrawHeader() + 1;
+
+            Console.SetCursorPosition(0, contentTop);
 
             Console.WriteLine("Current Settings");
             Console.WriteLine("────────────────────────────────────────────");
@@ -278,6 +284,10 @@
 
             Console.WriteLine("Press any key to return...");
             Console.ReadKey(true);
+
+            // Reset the entire screen before returning
+            ConsoleUi.ResetPage(0);
+            ConsoleUi.DrawHeader();
         }
 
         private static void SavePathSetting(string prompt, string settingsFile, int promptTop)
@@ -297,6 +307,10 @@
                 Console.WriteLine("No path entered.");
                 Console.WriteLine("Press any key to return...");
                 Console.ReadKey(true);
+
+                // Reset the entire screen before returning
+                ConsoleUi.ResetPage(0);
+                ConsoleUi.DrawHeader();
                 return;
             }
 
@@ -305,6 +319,10 @@
                 Console.WriteLine("Folder not found. Please create it or check the path.");
                 Console.WriteLine("Press any key to return...");
                 Console.ReadKey(true);
+
+                // Reset the entire screen before returning
+                ConsoleUi.ResetPage(0);
+                ConsoleUi.DrawHeader();
                 return;
             }
 
@@ -315,6 +333,10 @@
             Console.WriteLine($"Saved path: {path}");
             Console.WriteLine("Press any key to return...");
             Console.ReadKey(true);
+
+            // Reset the entire screen before returning
+            ConsoleUi.ResetPage(0);
+            ConsoleUi.DrawHeader();
         }
 
         private static string GetSavedPath(string settingsFile)
@@ -389,6 +411,10 @@
                 Console.WriteLine("No file path entered.");
                 Console.WriteLine("Press any key to return...");
                 Console.ReadKey(true);
+
+                // Reset the entire screen before returning
+                ConsoleUi.ResetPage(0);
+                ConsoleUi.DrawHeader();
                 return;
             }
 
@@ -397,6 +423,10 @@
                 Console.WriteLine("File not found. Please check the path.");
                 Console.WriteLine("Press any key to return...");
                 Console.ReadKey(true);
+
+                // Reset the entire screen before returning
+                ConsoleUi.ResetPage(0);
+                ConsoleUi.DrawHeader();
                 return;
             }
 
@@ -407,6 +437,10 @@
             Console.WriteLine($"Saved file path: {path}");
             Console.WriteLine("Press any key to return...");
             Console.ReadKey(true);
+
+            // Reset the entire screen before returning
+            ConsoleUi.ResetPage(0);
+            ConsoleUi.DrawHeader();
         }
 
         private static void DrawFullMenu(string[] options, int selected, int menuTop, int menuWidth)

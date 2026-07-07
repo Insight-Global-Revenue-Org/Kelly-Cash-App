@@ -22,7 +22,7 @@ namespace KellyCashApp.Workflows
 
                 int promptTop = menuTop + 6;
 
-                ClearArea(promptTop, 10);
+                ConsoleUi.ResetPage(promptTop);
                 Console.SetCursorPosition(0, promptTop);
 
                 if (selected == 0)
@@ -35,12 +35,13 @@ namespace KellyCashApp.Workflows
                     UAC.RunFullCashReportPullForward(promptTop);
                 }
 
-                ClearArea(promptTop, 12);
+                ConsoleUi.ResetPage(promptTop);
             }
         }
 
         private static void RunOpenInvoicePullForward(int promptTop)
         {
+            ConsoleUi.ResetPage(promptTop);
             string? newOirPath = FileSelector.SelectFile(
                 "Paste the full file path of your NEW Open Invoice Report:",
                 promptTop
@@ -51,6 +52,10 @@ namespace KellyCashApp.Workflows
                 Console.WriteLine("File not found. Please check the NEW OIR path.");
                 Console.WriteLine("Press any key to return...");
                 Console.ReadKey(true);
+
+                // Reset the entire screen before returning
+                ConsoleUi.ResetPage(0);
+                ConsoleUi.DrawHeader();
                 return;
             }
 
@@ -64,6 +69,10 @@ namespace KellyCashApp.Workflows
                 Console.WriteLine("File not found. Please check the OLD OIR path.");
                 Console.WriteLine("Press any key to return...");
                 Console.ReadKey(true);
+
+                // Reset the entire screen before returning
+                ConsoleUi.ResetPage(0);
+                ConsoleUi.DrawHeader();
                 return;
             }
 
@@ -91,10 +100,16 @@ namespace KellyCashApp.Workflows
                 loading = false;
                 spinner.Wait();
 
-                ClearArea(promptTop, 18);
-                Console.SetCursorPosition(0, promptTop);
+                ConsoleUi.ResetPage(0);
+                int newPromptTop = ConsoleUi.DrawHeader() + 1;
 
+                Console.SetCursorPosition(0, newPromptTop);
                 Console.WriteLine("Open Invoice Report prepared successfully.");
+                Console.WriteLine($"Saved to: {outputPath}");
+                Console.WriteLine();
+
+                ShowFallenOffInvoiceMarquee(fallenOffInvoices, newPromptTop + 4);
+
                 Console.WriteLine($"Saved to: {outputPath}");
                 Console.WriteLine();
 
@@ -106,7 +121,7 @@ namespace KellyCashApp.Workflows
             }
             catch (Exception ex)
             {
-                ClearArea(promptTop, 10);
+                ConsoleUi.ResetPage(promptTop);
                 Console.SetCursorPosition(0, promptTop);
 
                 Console.WriteLine("Something went wrong while preparing the OIR:");
@@ -114,6 +129,10 @@ namespace KellyCashApp.Workflows
                 Console.WriteLine();
                 Console.WriteLine("Press any key to return...");
                 Console.ReadKey(true);
+
+                // Reset the entire screen before returning
+                ConsoleUi.ResetPage(0);
+                ConsoleUi.DrawHeader();
             }
         }
 

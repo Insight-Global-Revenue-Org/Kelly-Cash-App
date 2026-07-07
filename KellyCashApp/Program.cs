@@ -11,25 +11,8 @@ using System.Globalization;
 
 Console.ForegroundColor = ConsoleColor.White;
 
-// tests
+int fixedMenuTop = ConsoleUi.DrawHeader();
 
-Console.ForegroundColor = ConsoleColor.White;
-
-Console.WriteLine(@"
-  _  __    _ _         ____                  _               
- | |/ /___| | |_   _  / ___|  ___ _ ____   _(_) ___ ___  ___ 
- | ' // _ \ | | | | | \___ \ / _ \ '__\ \ / / |/ __/ _ \/ __|
- | . \  __/ | | |_| |  ___) |  __/ |   \ V /| | (_|  __/\__ \
- |_|\_\___|_|_|\__, | |____/ \___|_|    \_/ |_|\___\___||___/
-               |___/                                         
-");
-
-Console.ResetColor();
-
-Thread.Sleep(100);
-
-Console.WriteLine("A Week-Ending Line Total Aggregate Script");
-Console.WriteLine("──────────────────────────────────────────────────");
 var openInvoiceMatches = new Dictionary<string, OirMatch>();
 var openInvoiceMatchesMultiple = new Dictionary<string, List<OirMatch>>();
 var openInvoiceMatchesByClientProject = new Dictionary<string, List<OirMatch>>();
@@ -38,7 +21,6 @@ bool skipMicrosoftVmsPrompt = false;
 
 string? inputPath = null;
 int defaultMenuOption = 0;
-int fixedMenuTop = Console.CursorTop;
 
 // Main application workflow loop.
 // Menu navigation, OIR imports, remittance processing (Any additional process workflows will be delegated to other C# classes)
@@ -138,19 +120,27 @@ while (true)
 
     if (selected == 2)
     {
-        ClearArea(fixedMenuTop, 10);
+        ConsoleUi.ResetPage(0);
+        fixedMenuTop = ConsoleUi.DrawHeader();
+
         OIR.ShowNotesMenu(fixedMenuTop);
 
-        ClearArea(fixedMenuTop, 10);
+        ConsoleUi.ResetPage(0);
+        fixedMenuTop = ConsoleUi.DrawHeader();
+
         defaultMenuOption = 2;
         continue;
     }
     if (selected == 3)
     {
-        ClearArea(fixedMenuTop, 10);
+        ConsoleUi.ResetPage(0);
+        fixedMenuTop = ConsoleUi.DrawHeader();
+
         Settings.ShowSettingsMenu(fixedMenuTop);
 
-        ClearArea(fixedMenuTop, 10);
+        ConsoleUi.ResetPage(0);
+        fixedMenuTop = ConsoleUi.DrawHeader();
+
         defaultMenuOption = 3;
         continue;
     }

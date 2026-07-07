@@ -8,6 +8,7 @@ namespace KellyCashApp.Workflows
     {
         public static void RunFullCashReportPullForward(int promptTop)
         {
+            ConsoleUi.ResetPage(promptTop);
             string? newUacPath = FileSelector.SelectFile(
                 "Paste the full file path of your NEW Full Cash Report:",
                 promptTop
@@ -31,6 +32,10 @@ namespace KellyCashApp.Workflows
                 Console.WriteLine("File not found. Please check the OLD Full Cash Report path.");
                 Console.WriteLine("Press any key to return...");
                 Console.ReadKey(true);
+
+                // Reset the entire screen before returning
+                ConsoleUi.ResetPage(0);
+                ConsoleUi.DrawHeader();
                 return;
             }
 
@@ -58,10 +63,16 @@ namespace KellyCashApp.Workflows
                 loading = false;
                 spinner.Wait();
 
-                ClearArea(promptTop, 12);
-                Console.SetCursorPosition(0, promptTop);
+                ConsoleUi.ResetPage(0);
+                int newPromptTop = ConsoleUi.DrawHeader() + 1;
 
+                Console.SetCursorPosition(0, newPromptTop);
                 Console.WriteLine("Full Cash Report prepared successfully.");
+                Console.WriteLine($"Saved to: {outputPath}");
+                Console.WriteLine();
+
+                ShowNewPaymentsLog(newPayments);
+
                 Console.WriteLine($"Saved to: {outputPath}");
                 Console.WriteLine();
                 ShowNewPaymentsLog(newPayments);
@@ -71,7 +82,7 @@ namespace KellyCashApp.Workflows
             }
             catch (Exception ex)
             {
-                ClearArea(promptTop, 10);
+                ConsoleUi.ResetPage(promptTop);
                 Console.SetCursorPosition(0, promptTop);
 
                 Console.WriteLine("Something went wrong while preparing the Full Cash Report:");
@@ -79,6 +90,10 @@ namespace KellyCashApp.Workflows
                 Console.WriteLine();
                 Console.WriteLine("Press any key to return...");
                 Console.ReadKey(true);
+
+                // Reset the entire screen before returning
+                ConsoleUi.ResetPage(0);
+                ConsoleUi.DrawHeader();
             }
         }
 
