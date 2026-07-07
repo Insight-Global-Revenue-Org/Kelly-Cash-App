@@ -10,9 +10,7 @@ namespace KellyCashApp.Processors.Guidant
     {
         public static bool IsGuidantFormat(IXLWorksheet worksheet)
         {
-            return worksheet.Cell(1, 1).GetString().Trim().Equals("Customer", StringComparison.OrdinalIgnoreCase)
-                && worksheet.Cell(1, 2).GetString().Trim().Equals("Vendor", StringComparison.OrdinalIgnoreCase)
-                && worksheet.Cell(1, 3).GetString().Trim().Equals("Con Invoice", StringComparison.OrdinalIgnoreCase);
+            return FindGuidantHeaderRow(worksheet) != -1;
         }
 
         public static string Process(
@@ -53,7 +51,12 @@ namespace KellyCashApp.Processors.Guidant
             IXLWorksheet worksheet,
             Dictionary<string, OirMatch> openInvoiceMatches)
         {
-            int headerRow = 1;
+            int headerRow = FindGuidantHeaderRow(worksheet);
+
+            if (headerRow == -1)
+            {
+                throw new Exception($"Could not find Guidant header row on sheet: {worksheet.Name}");
+            }
 
             int invoiceColumn = FindColumn(worksheet, headerRow, "Invoice");
             int invoiceIdColumn = FindColumn(worksheet, headerRow, "Invoice ID");
@@ -227,6 +230,28 @@ namespace KellyCashApp.Processors.Guidant
                 return parsedDate.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
 
             return rawValue;
+        }
+
+        private static int FindGuidantHeaderRow(IXLWorksheet worksheet)
+        {
+            int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 10;
+
+            for (int row = 1; row <= Math.Min(lastRow, 10); row++)
+            {
+                string firstHeader = worksheet.Cell(row, 1).GetString().Trim();
+                string secondHeader = worksheet.Cell(row, 2).GetString().Trim();
+                string thirdHeader = worksheet.Cell(row, 3).GetString().Trim();
+
+                bool isGuidantHeader =
+                    firstHeader.Equals("Customer", StringComparison.OrdinalIgnoreCase)
+                    && secondHeader.Equals("Vendor", StringComparison.OrdinalIgnoreCase)
+                    && thirdHeader.Equals("Con Invoice", StringComparison.OrdinalIgnoreCase);
+
+                if (isGuidantHeader)
+                    return row;
+            }
+
+            return -1;
         }
 
         private static int FindColumn(IXLWorksheet worksheet, int headerRow, string headerName)
