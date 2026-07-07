@@ -95,7 +95,14 @@ namespace KellyCashApp.Processors.Guidant
                 string oirInvoice = "";
                 decimal amountDue = 0;
 
-                if (TryMatchWithOneDaySpread(formattedName, formattedWeekEnding, openInvoiceMatches, out OirMatch match))
+                string hoursType = worksheet.Cell(row, hoursTypeColumn).GetString().Trim();
+                decimal billAmount = GetDecimalValue(worksheet.Cell(row, billAmountColumn));
+
+                bool matched = hoursType.Equals("EXP", StringComparison.OrdinalIgnoreCase)
+                    ? TryMatchExpenseWithSevenDaySpread(formattedName, formattedWeekEnding, billAmount, openInvoiceMatches, out OirMatch match)
+                    : TryMatchWithOneDaySpread(formattedName, formattedWeekEnding, openInvoiceMatches, out match);
+
+                if (matched)
                 {
                     oirInvoice = match.DocumentNumber;
                     amountDue = match.RemainingAmount;
@@ -107,13 +114,13 @@ namespace KellyCashApp.Processors.Guidant
                     Name = formattedName,
                     Invoice = oirInvoice,
                     AmountDue = amountDue,
-                    AggregateAmountPaid = GetDecimalValue(worksheet.Cell(row, billAmountColumn)),
+                    AggregateAmountPaid = billAmount,
                     Notes = "",
                     Concat = concat,
                     GuidantInvoice = worksheet.Cell(row, invoiceColumn).GetString().Trim(),
                     InvoiceId = worksheet.Cell(row, invoiceIdColumn).GetString().Trim(),
                     TimesheetId = worksheet.Cell(row, timesheetColumn).GetString().Trim(),
-                    HoursType = worksheet.Cell(row, hoursTypeColumn).GetString().Trim(),
+                    HoursType = hoursType,
                     BillHours = GetDecimalValue(worksheet.Cell(row, billHoursColumn))
                 });
             }
@@ -205,6 +212,8 @@ namespace KellyCashApp.Processors.Guidant
             return false;
         }
 
+
+
         private static string FormatName(string input)
         {
             input = input.Trim();
@@ -236,6 +245,64 @@ namespace KellyCashApp.Processors.Guidant
                 return parsedDate.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
 
             return rawValue;
+        }
+
+        // Expense matching allows for a ±7 day spread and a 5% margin of error in the amount due.
+        private static bool TryMatchExpenseWithSevenDaySpread(
+            string formattedName,
+            string formattedWeekEnding,
+            decimal billAmount,
+            Dictionary<string, OirMatch> openInvoiceMatches,
+            out OirMatch match)
+        {
+            match = null!;
+
+            if (!DateTime.TryParse(formattedWeekEnding, out DateTime baseDate))
+                return false;
+
+            // First pass: exact amount match within ±7 days
+            for (int offset = -7; offset <= 7; offset++)
+            {
+                DateTime testDate = baseDate.AddDays(offset);
+                string testDateString = testDate.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+                string testKey = $"{formattedName} {testDateString}".Trim();
+
+                if (openInvoiceMatches.TryGetValue(testKey, out OirMatch exactMatch)
+                    && Math.Abs(exactMatch.RemainingAmount - billAmount) == 0)
+                {
+                    match = exactMatch;
+                    return true;
+                }
+            }
+
+            // Second pass: within 5% margin within ±7 days
+            for (int offset = -7; offset <= 7; offset++)
+            {
+                DateTime testDate = baseDate.AddDays(offset);
+                string testDateString = testDate.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+                string testKey = $"{formattedName} {testDateString}".Trim();
+
+                if (openInvoiceMatches.TryGetValue(testKey, out OirMatch marginMatch)
+                    && IsWithinFivePercent(marginMatch.RemainingAmount, billAmount))
+                {
+                    match = marginMatch;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // Check if the oirAmount is within 5% of the paymentAmount
+        private static bool IsWithinFivePercent(decimal oirAmount, decimal paymentAmount)
+        {
+            if (paymentAmount == 0)
+                return oirAmount == 0;
+
+            decimal difference = Math.Abs(oirAmount - paymentAmount);
+            decimal allowedDifference = Math.Abs(paymentAmount) * 0.05m;
+
+            return difference <= allowedDifference;
         }
 
         private static int FindGuidantHeaderRow(IXLWorksheet worksheet)
