@@ -442,14 +442,17 @@ while (true)
         }
 
         // Conditional check for Guidant payments (Re-Routing)
-        if (GuidantPayment.IsGuidantFormat(worksheet))
+    if (GuidantPayment.IsGuidantFormat(worksheet))
         {
             string guidantOutputPath = GuidantPayment.Process(
-                workbook,
-                worksheet,
-                inputPath,
-                openInvoiceMatches
-            );
+            workbook,
+            worksheet,
+            inputPath,
+            openInvoiceMatches
+        );
+            // This better fix it
+            workbook.Dispose();
+            stream.Dispose();
 
             loading = false;
             spinner.Wait();
