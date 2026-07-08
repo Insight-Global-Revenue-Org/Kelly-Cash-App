@@ -8,11 +8,14 @@ namespace KellyCashApp.Processors.Guidant
 {
     internal class GuidantPayment
     {
+        // Payment Processing Class for Guidant - The excel logic below is triggered from Program.cs through its conditional workflow check. If you need to update any of your excel logic in the future, do it here!
+        // Guidant header row identifiers (Customer, Vendor, Con Invoice) - I moved this to a helper method at the bottom of this class (if it needs to change in the future, it can be done in one place)
         public static bool IsGuidantFormat(IXLWorksheet worksheet)
         {
             return FindGuidantHeaderRow(worksheet) != -1;
         }
 
+        // Primary public method that processes all worksheets in the workbook
         public static string Process(
             XLWorkbook workbook,
             IXLWorksheet worksheet,
@@ -20,33 +23,38 @@ namespace KellyCashApp.Processors.Guidant
             Dictionary<string, OirMatch> openInvoiceMatches)
         {
             decimal totalAcrossAllSheets = 0;
-
+            // Find all worksheets in the workbook that match the Guidant format
             var guidantSheets = workbook.Worksheets
                 .Where(sheet => IsGuidantFormat(sheet))
                 .ToList();
 
+            // Process all detected Guidant sheets (as long as they meet the header criteria!)
             foreach (var sheet in guidantSheets)
             {
                 decimal sheetTotal = ProcessSingleSheet(sheet, openInvoiceMatches);
                 totalAcrossAllSheets += sheetTotal;
             }
 
+            // If no Guidant sheets were found, throw an exception
             string downloadsPath = Settings.GetRemittanceSavePath();
-
+            // If the downloads path is not set, throw an exception
             string formattedTotal = totalAcrossAllSheets.ToString("N2", CultureInfo.InvariantCulture);
-
+            // If the downloads path is not set, throw an exception
             string outputPath = GetUniqueOutputPath(
                 downloadsPath,
                 $"Guidant - {formattedTotal}.xlsx"
             );
 
+            // Saves the processed workbook to the output path
             workbook.SaveAs(outputPath);
 
+            // Log the remittance run in analytics
             Analytics.LogRemittanceRun($"Guidant - {formattedTotal}");
 
             return outputPath;
         }
 
+        // Primary Payment Processing Logic for Guidant!
         private static decimal ProcessSingleSheet(
             IXLWorksheet worksheet,
             Dictionary<string, OirMatch> openInvoiceMatches)
@@ -58,6 +66,7 @@ namespace KellyCashApp.Processors.Guidant
                 throw new Exception($"Could not find Guidant header row on sheet: {worksheet.Name}");
             }
 
+            // Find the required columns based on the header row
             int invoiceColumn = FindColumn(worksheet, headerRow, "Invoice");
             int invoiceIdColumn = FindColumn(worksheet, headerRow, "Invoice ID");
             int timesheetColumn = FindColumn(worksheet, headerRow, "Timesheet");
@@ -67,6 +76,7 @@ namespace KellyCashApp.Processors.Guidant
             int billHoursColumn = FindColumn(worksheet, headerRow, "Bill Hours");
             int billAmountColumn = FindColumn(worksheet, headerRow, "Bill Amount");
 
+            // Validates that all required columns were found & throws the below exception if any are missing
             if (invoiceColumn == -1 || invoiceIdColumn == -1 || timesheetColumn == -1 ||
                 weekEndingColumn == -1 || associateColumn == -1 || hoursTypeColumn == -1 ||
                 billHoursColumn == -1 || billAmountColumn == -1)
@@ -76,9 +86,11 @@ namespace KellyCashApp.Processors.Guidant
 
             int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? headerRow;
 
+            // Load name changes from the configuration file (if any)
             var nameChanges = Rename.LoadNameChanges();
             var outputRows = new List<GuidantOutputRow>();
 
+            // Process each row in the worksheet, starting from the row after the header
             for (int row = headerRow + 1; row <= lastRow; row++)
             {
                 string rawName = worksheet.Cell(row, associateColumn).GetString().Trim();
@@ -86,28 +98,34 @@ namespace KellyCashApp.Processors.Guidant
                 if (string.IsNullOrWhiteSpace(rawName))
                     continue;
 
+                // Skip rows with empty names
                 string formattedName = FormatName(rawName);
                 formattedName = Rename.ApplyNameChange(formattedName, nameChanges);
 
+                // Skip rows with empty week ending dates
                 string formattedWeekEnding = FormatDate(worksheet.Cell(row, weekEndingColumn));
                 string concat = $"{formattedName} {formattedWeekEnding}".Trim();
 
                 string oirInvoice = "";
                 decimal amountDue = 0;
 
+                // Determine if the row is an expense or non-expense based on the "Hours Type" column
                 string hoursType = worksheet.Cell(row, hoursTypeColumn).GetString().Trim();
                 decimal billAmount = GetDecimalValue(worksheet.Cell(row, billAmountColumn));
 
+                // Attempt to match the row with an open invoice based on the hours type and date spread
                 bool matched = hoursType.Equals("EXP", StringComparison.OrdinalIgnoreCase)
                     ? TryMatchExpenseWithSevenDaySpread(formattedName, formattedWeekEnding, billAmount, openInvoiceMatches, out OirMatch match)
                     : TryMatchWithOneDaySpread(formattedName, formattedWeekEnding, openInvoiceMatches, out match);
 
+                // If a match is found, retrieve the corresponding invoice number and amount due
                 if (matched)
                 {
                     oirInvoice = match.DocumentNumber;
                     amountDue = match.RemainingAmount;
                 }
 
+                // Add the processed row to the output list
                 outputRows.Add(new GuidantOutputRow
                 {
                     WeekEndingDate = formattedWeekEnding,
@@ -125,10 +143,12 @@ namespace KellyCashApp.Processors.Guidant
                 });
             }
 
+            // Calculate the aggregate amount paid for each unique "Concat" value
             var totalsByConcat = outputRows
                 .GroupBy(r => r.Concat)
                 .ToDictionary(g => g.Key, g => g.Sum(r => r.AggregateAmountPaid));
 
+            // Update each output row with the calculated aggregate amount paid
             foreach (var row in outputRows)
             {
                 row.AggregateAmountPaid = totalsByConcat[row.Concat];
@@ -142,6 +162,7 @@ namespace KellyCashApp.Processors.Guidant
 
             worksheet.Clear();
 
+            // Write headers to the first row of the worksheet
             string[] headers =
             {
                 "Week Ending Date",
@@ -158,21 +179,26 @@ namespace KellyCashApp.Processors.Guidant
                 "Bill Hours"
             };
 
+            // First, write the headers to the first row of the worksheet
             for (int col = 1; col <= headers.Length; col++)
                 worksheet.Cell(1, col).Value = headers[col - 1];
 
+            // Second, write the processed output rows to the worksheet, starting from the second row
             for (int i = 0; i < outputRows.Count; i++)
             {
                 int row = i + 2;
                 GuidantOutputRow item = outputRows[i];
 
+                // Write each property of the output row to the corresponding cell in the worksheet
                 worksheet.Cell(row, 1).Value = item.WeekEndingDate;
                 worksheet.Cell(row, 2).Value = item.Name;
                 worksheet.Cell(row, 3).Value = item.Invoice;
 
+                // Only write the Amount Due if it's not zero to avoid cluttering the output with unnecessary zeros
                 if (item.AmountDue != 0)
                     worksheet.Cell(row, 4).Value = item.AmountDue;
 
+                // Otherwise, leave the cell empty for clarity
                 worksheet.Cell(row, 5).Value = item.AggregateAmountPaid;
                 worksheet.Cell(row, 6).Value = item.Notes;
                 worksheet.Cell(row, 7).Value = item.Concat;
@@ -183,11 +209,13 @@ namespace KellyCashApp.Processors.Guidant
                 worksheet.Cell(row, 12).Value = item.BillHours;
             }
 
+            // Apply standardized formatting to the output worksheet, including fonts, borders, number formats, and column widths (review the ApplyFormatting method for details!!!!!!!!)
             ApplyFormatting(worksheet, outputRows.Count + 1, headers.Length);
-
+            // Return the total aggregate amount paid across all output rows for this sheet
             return outputRows.Sum(r => r.AggregateAmountPaid);
         }
 
+        // Try to match a non-expense row with a ±1 day spread
         private static bool TryMatchWithOneDaySpread(
             string formattedName,
             string formattedWeekEnding,
@@ -196,24 +224,28 @@ namespace KellyCashApp.Processors.Guidant
         {
             match = null!;
 
+            // Check if the formattedWeekEnding can be parsed into a DateTime object
             if (!DateTime.TryParse(formattedWeekEnding, out DateTime baseDate))
                 return false;
 
+            // Check for matches within a ±1 day spread
             for (int offset = -1; offset <= 1; offset++)
             {
                 DateTime testDate = baseDate.AddDays(offset);
                 string testDateString = testDate.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
                 string testKey = $"{formattedName} {testDateString}".Trim();
 
+                // Try to find a match in the openInvoiceMatches dictionary using the constructed testKey
                 if (openInvoiceMatches.TryGetValue(testKey, out match))
                     return true;
             }
 
+            // If no match is found within the ±1 day spread, return false - the match variable will remain null
             return false;
         }
 
 
-
+        // Formats the name from "Last, First" to "First Last" and apply title casing
         private static string FormatName(string input)
         {
             input = input.Trim();
@@ -221,19 +253,24 @@ namespace KellyCashApp.Processors.Guidant
             if (!input.Contains(","))
                 return input;
 
+            // Split the input into two parts: last name and first name, using the comma as a delimiter
             string[] parts = input.Split(',', 2);
 
+            // Convert both parts to title case and trim any extra whitespace
             string last = ToTitle(parts[0].Trim());
             string first = ToTitle(parts[1].Trim());
 
+            // Return the formatted name in "First Last" order, ensuring no leading or trailing whitespace
             return $"{first} {last}".Trim();
         }
 
+        // Converts a string to title case using the current culture
         private static string ToTitle(string value)
         {
             return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value.ToLower());
         }
 
+        // Formats the date in the cell to "MM/dd/yyyy" format, ***handles both DateTime and string representations
         private static string FormatDate(IXLCell cell)
         {
             if (cell.Value.IsDateTime)
@@ -305,6 +342,7 @@ namespace KellyCashApp.Processors.Guidant
             return difference <= allowedDifference;
         }
 
+        // Helper to find the header row for the Guidant format by checking the first 10 rows for specific header names
         private static int FindGuidantHeaderRow(IXLWorksheet worksheet)
         {
             int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? 10;
@@ -327,6 +365,7 @@ namespace KellyCashApp.Processors.Guidant
             return -1;
         }
 
+        // Helper to find the column index for a given header name in the specified header row
         private static int FindColumn(IXLWorksheet worksheet, int headerRow, string headerName)
         {
             int lastColumn = worksheet.LastColumnUsed()?.ColumnNumber() ?? 50;
@@ -342,6 +381,7 @@ namespace KellyCashApp.Processors.Guidant
             return -1;
         }
 
+        // Helper to parse a cell's value into a decimal, handling currency formatting and parentheses for negative values
         private static decimal GetDecimalValue(IXLCell cell)
         {
             string rawValue = cell.Value.ToString()
@@ -357,6 +397,7 @@ namespace KellyCashApp.Processors.Guidant
             return 0;
         }
 
+        // Standardized Output File Formatting: fonts, borders, number formats, and column widths
         private static void ApplyFormatting(IXLWorksheet worksheet, int lastRow, int lastColumn)
         {
             var range = worksheet.Range(1, 1, lastRow, lastColumn);
@@ -425,6 +466,7 @@ namespace KellyCashApp.Processors.Guidant
             worksheet.Range(1, 1, lastRow, lastColumn).SetAutoFilter();
         }
 
+        // Helper to generate a unique output file path by appending a counter if the file already exists
         private static string GetUniqueOutputPath(string folderPath, string fileName)
         {
             string fileNameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
@@ -433,6 +475,7 @@ namespace KellyCashApp.Processors.Guidant
             string outputPath = Path.Combine(folderPath, fileName);
             int counter = 1;
 
+            // If the file already exists, just append a counter to the filename until a unique name is found i guess (don't overwrite))
             while (File.Exists(outputPath))
             {
                 outputPath = Path.Combine(folderPath, $"{fileNameWithoutExt} ({counter}){extension}");
@@ -442,6 +485,7 @@ namespace KellyCashApp.Processors.Guidant
             return outputPath;
         }
 
+        // OutputRow class - the Guidant output row structure that will be used to store processed data before writing it back to the worksheet (nullable strings are initialized to empty strings to avoid null reference issues)
         private class GuidantOutputRow
         {
             public string WeekEndingDate { get; set; } = "";
