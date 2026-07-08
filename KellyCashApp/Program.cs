@@ -17,6 +17,7 @@ int fixedMenuTop = ConsoleUi.DrawHeader();
 var openInvoiceMatches = new Dictionary<string, OirMatch>();
 var openInvoiceMatchesMultiple = new Dictionary<string, List<OirMatch>>();
 var openInvoiceMatchesByClientProject = new Dictionary<string, List<OirMatch>>();
+string? importedOirStatusMessage = null;
 Dictionary<string, List<MicrosoftVmsMatch>>? microsoftVmsMatches = null;
 bool skipMicrosoftVmsPrompt = false;
 
@@ -35,7 +36,7 @@ while (true)
     "Settings",
     "Analytics Logs",
     "Exit"
-}, defaultMenuOption, fixedMenuTop);
+}, defaultMenuOption, fixedMenuTop, importedOirStatusMessage);
 
     if (selected == 5)
         break;
@@ -898,7 +899,7 @@ static string FormatWeekEndingDate(IXLCell cell)
 
 // The main console gui menu rendering function. Displays list of options, highlights the currently selected option,
 // and allows the user to navigate with the up/down arrow keys and select with Enter. Any additional classes wired into the main Program.cs will also be updated here.
-static int ShowMenu(string[] options, int defaultSelected, int menuTop)
+static int ShowMenu(string[] options, int defaultSelected, int menuTop, string? statusMessage = null)
 {
     int selected = defaultSelected;
     int menuWidth = options.Max(o => o.Length) + 4;
@@ -913,6 +914,8 @@ static int ShowMenu(string[] options, int defaultSelected, int menuTop)
     Console.CursorVisible = false;
 
     DrawFullMenu(options, selected, menuTop, menuWidth);
+
+    DrawStatusMessage(statusMessage);
 
     while (true)
     {
@@ -932,6 +935,7 @@ static int ShowMenu(string[] options, int defaultSelected, int menuTop)
         if (selected != oldSelected)
         {
             DrawFullMenu(options, selected, menuTop, menuWidth);
+            DrawStatusMessage(statusMessage);
         }
     }
 
@@ -943,6 +947,26 @@ static int ShowMenu(string[] options, int defaultSelected, int menuTop)
     Console.WriteLine();
 
     return selected;
+}
+
+static void DrawStatusMessage(string? message)
+{
+    if (string.IsNullOrWhiteSpace(message))
+        return;
+
+    int statusLine = Console.WindowHeight - 2;
+
+    Console.SetCursorPosition(0, statusLine);
+    Console.Write(new string(' ', Console.WindowWidth - 1));
+
+    Console.SetCursorPosition(0, statusLine);
+    Console.ForegroundColor = ConsoleColor.Green;
+
+    Console.Write(message.Length >= Console.WindowWidth
+        ? message[..(Console.WindowWidth - 1)]
+        : message);
+
+    Console.ResetColor();
 }
 
 static void DrawFullMenu(string[] options, int selected, int menuTop, int menuWidth)
