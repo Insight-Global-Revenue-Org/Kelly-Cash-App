@@ -2,7 +2,7 @@
 {
     public static void ResetPage(int startLine = 0)
     {
-        // Clear the Windows Terminal scrollback history
+        // Clear the Windows Terminal
         Console.Write("\x1b[3J");
 
         Console.ResetColor();
@@ -19,10 +19,13 @@
         Console.SetCursorPosition(0, startLine);
         Console.CursorVisible = true;
     }
+
+    // <summary>
     public static int DrawHeader()
     {
         Console.ForegroundColor = ConsoleColor.White;
 
+        // Moved this UI (and its helper function) to it's own public class :) If you are reading this, Hello!
         Console.WriteLine(@"
   _  __    _ _         ____                  _               
  | |/ /___| | |_   _  / ___|  ___ _ ____   _(_) ___ ___  ___ 
