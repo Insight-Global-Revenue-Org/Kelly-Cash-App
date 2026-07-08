@@ -68,6 +68,8 @@ namespace KellyCashApp.Processors.Guidant
 
             // Find the required columns based on the header row
             int invoiceColumn = FindColumn(worksheet, headerRow, "Invoice");
+            int conInvoiceColumn = FindColumn(worksheet, headerRow, "Con Invoice");
+
             int invoiceIdColumn = FindColumn(worksheet, headerRow, "Invoice ID");
             int timesheetColumn = FindColumn(worksheet, headerRow, "Timesheet");
             int weekEndingColumn = FindColumn(worksheet, headerRow, "WeekEnding");
@@ -76,8 +78,7 @@ namespace KellyCashApp.Processors.Guidant
             int billHoursColumn = FindColumn(worksheet, headerRow, "Bill Hours");
             int billAmountColumn = FindColumn(worksheet, headerRow, "Bill Amount");
 
-            // Validates that all required columns were found & throws the below exception if any are missing
-            if (invoiceColumn == -1 || invoiceIdColumn == -1 || timesheetColumn == -1 ||
+            if (conInvoiceColumn == -1 || invoiceIdColumn == -1 || timesheetColumn == -1 ||
                 weekEndingColumn == -1 || associateColumn == -1 || hoursTypeColumn == -1 ||
                 billHoursColumn == -1 || billAmountColumn == -1)
             {
@@ -135,7 +136,9 @@ namespace KellyCashApp.Processors.Guidant
                     AggregateAmountPaid = billAmount,
                     Notes = "",
                     Concat = concat,
-                    GuidantInvoice = worksheet.Cell(row, invoiceColumn).GetString().Trim(),
+                    GuidantInvoice = invoiceColumn != -1
+                        ? worksheet.Cell(row, invoiceColumn).GetString().Trim()
+                        : worksheet.Cell(row, conInvoiceColumn).GetString().Trim(),
                     InvoiceId = worksheet.Cell(row, invoiceIdColumn).GetString().Trim(),
                     TimesheetId = worksheet.Cell(row, timesheetColumn).GetString().Trim(),
                     HoursType = hoursType,
@@ -273,13 +276,30 @@ namespace KellyCashApp.Processors.Guidant
         // Formats the date in the cell to "MM/dd/yyyy" format, ***handles both DateTime and string representations
         private static string FormatDate(IXLCell cell)
         {
-            if (cell.Value.IsDateTime)
-                return cell.GetDateTime().ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+            if (cell.TryGetValue(out DateTime dateValue))
+                return dateValue.ToString("M/d/yyyy", CultureInfo.InvariantCulture);
 
-            string rawValue = cell.GetString().Trim();
+            if (cell.TryGetValue(out double serialDate))
+            {
+                try
+                {
+                    return DateTime.FromOADate(serialDate).ToString("M/d/yyyy", CultureInfo.InvariantCulture);
+                }
+                catch
+                {
+                    // Fall through and try parsing as text
+                }
+            }
 
-            if (DateTime.TryParse(rawValue, out DateTime parsedDate))
-                return parsedDate.ToString("MM/dd/yyyy", CultureInfo.InvariantCulture);
+            string rawValue = cell.GetFormattedString().Trim();
+
+            if (DateTime.TryParse(rawValue, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime parsedDate))
+                return parsedDate.ToString("M/d/yyyy", CultureInfo.InvariantCulture);
+
+            rawValue = cell.GetString().Trim();
+
+            if (DateTime.TryParse(rawValue, CultureInfo.InvariantCulture, DateTimeStyles.None, out parsedDate))
+                return parsedDate.ToString("M/d/yyyy", CultureInfo.InvariantCulture);
 
             return rawValue;
         }
