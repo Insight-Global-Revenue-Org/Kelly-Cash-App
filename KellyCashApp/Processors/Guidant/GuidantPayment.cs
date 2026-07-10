@@ -78,7 +78,7 @@ namespace KellyCashApp.Processors.Guidant
             int billHoursColumn = FindColumn(worksheet, headerRow, "Bill Hours");
             int billAmountColumn = FindColumn(worksheet, headerRow, "Bill Amount");
 
-            if (conInvoiceColumn == -1 || invoiceIdColumn == -1 || timesheetColumn == -1 ||
+            if ((invoiceColumn == -1 && conInvoiceColumn == -1) || invoiceIdColumn == -1 || timesheetColumn == -1 ||
                 weekEndingColumn == -1 || associateColumn == -1 || hoursTypeColumn == -1 ||
                 billHoursColumn == -1 || billAmountColumn == -1)
             {
@@ -376,7 +376,8 @@ namespace KellyCashApp.Processors.Guidant
                 bool isGuidantHeader =
                     firstHeader.Equals("Customer", StringComparison.OrdinalIgnoreCase)
                     && secondHeader.Equals("Vendor", StringComparison.OrdinalIgnoreCase)
-                    && thirdHeader.Equals("Con Invoice", StringComparison.OrdinalIgnoreCase);
+                        && new[] { "Con Invoice", "Invoice" }
+                        .Contains(thirdHeader, StringComparer.OrdinalIgnoreCase);
 
                 if (isGuidantHeader)
                     return row;
