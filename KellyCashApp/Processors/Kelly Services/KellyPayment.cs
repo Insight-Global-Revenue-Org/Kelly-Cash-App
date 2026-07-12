@@ -36,10 +36,16 @@ namespace KellyCashApp.Processors.Kelly_Services
                 headerRow,
                 "Location Description");
 
+            int userChar1Column = FindColumn(
+                worksheet,
+                headerRow,
+                "User Char 1");
+
             if (weekEndingColumn == -1 ||
                 contractorColumn == -1 ||
                 lineTotalColumn == -1 ||
-                locationDescriptionColumn == -1)
+                locationDescriptionColumn == -1 ||
+                userChar1Column == -1)
             {
                 throw new InvalidOperationException(
                     "Could not find Week Ending Date, Name, " +
@@ -156,6 +162,7 @@ namespace KellyCashApp.Processors.Kelly_Services
                 nameFormattedColumn,
                 invoiceColumn,
                 amountColumn,
+                userChar1Column,
                 openInvoiceMatches);
 
             string downloadsPath =
@@ -258,6 +265,7 @@ namespace KellyCashApp.Processors.Kelly_Services
             int nameFormattedColumn,
             int invoiceColumn,
             int amountColumn,
+            int userChar1Column,
             Dictionary<string, OirMatch> openInvoiceMatches)
         {
             var totalsByContractorAndWeek =
@@ -330,9 +338,21 @@ namespace KellyCashApp.Processors.Kelly_Services
                 string formattedWeekEnding = FormatWeekEndingDate(
                     worksheet.Cell(targetRow, weekEndingColumn));
 
+                string userChar1 = worksheet
+                    .Cell(targetRow, userChar1Column)
+                    .GetString()
+                    .Trim();
+
+                bool isLabor =
+                    userChar1.Trim()
+                    .StartsWith("LABOR",
+                 StringComparison.OrdinalIgnoreCase);
+
                 if (!TryMatchWithDateSpread(
                     formattedName,
                     formattedWeekEnding,
+                    isLabor,
+                    aggregateTotal,
                     openInvoiceMatches,
                     out OirMatch? match))
                 {
@@ -593,6 +613,8 @@ namespace KellyCashApp.Processors.Kelly_Services
         private static bool TryMatchWithDateSpread(
             string formattedName,
             string formattedWeekEnding,
+            bool isLabor,
+            decimal aggregateAmount,
             Dictionary<string, OirMatch> openInvoiceMatches,
             out OirMatch? match)
         {
@@ -605,7 +627,9 @@ namespace KellyCashApp.Processors.Kelly_Services
                 return false;
             }
 
-            for (int offset = -2; offset <= 2; offset++)
+            int spread = isLabor ? 2 : 7;
+
+            for (int offset = -spread; offset <= spread; offset++)
             {
                 DateTime testDate = baseDate.AddDays(offset);
 
@@ -620,8 +644,25 @@ namespace KellyCashApp.Processors.Kelly_Services
                     testKey,
                     out OirMatch? foundMatch))
                 {
-                    match = foundMatch;
-                    return true;
+                    // Labor rows only care about the date spread.
+                    if (isLabor)
+                    {
+                        match = foundMatch;
+                        return true;
+                    }
+
+                    // Expense rows must also be within 5%.
+                    decimal difference =
+                        Math.Abs(foundMatch.RemainingAmount - aggregateAmount);
+
+                    decimal tolerance =
+                        Math.Abs(aggregateAmount) * 0.05m;
+
+                    if (difference <= tolerance)
+                    {
+                        match = foundMatch;
+                        return true;
+                    }
                 }
             }
 
