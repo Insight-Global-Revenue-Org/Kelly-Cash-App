@@ -108,13 +108,13 @@ namespace KellyCashApp.Workflows
                 int newPromptTop = ConsoleUi.DrawHeader() + 1;
 
                 Console.SetCursorPosition(0, newPromptTop);
+
                 Console.WriteLine("Open Invoice Report prepared successfully.");
                 Console.WriteLine($"Saved to: {outputPath}");
                 Console.WriteLine();
 
-                ShowFallenOffInvoiceMarquee(
-                    fallenOffInvoices,
-                    newPromptTop + 4);
+                // Let the console continue naturally from its current position.
+                ShowFallenOffInvoiceMarquee(fallenOffInvoices);
 
                 Console.WriteLine();
                 Console.WriteLine("Press any key to return to menu...");
@@ -469,9 +469,9 @@ namespace KellyCashApp.Workflows
             return fallenOffInvoices;
         }
 
-        private static void ShowFallenOffInvoiceMarquee(List<string> fallenOffInvoices, int startLine)
-        {
-            Console.SetCursorPosition(0, startLine);
+        private static void ShowFallenOffInvoiceMarquee(
+            List<string> fallenOffInvoices)
+            {
 
             if (fallenOffInvoices.Count == 0)
             {
@@ -483,7 +483,7 @@ namespace KellyCashApp.Workflows
             Console.WriteLine("Likely applied / closed out:");
             Console.WriteLine();
 
-            int maxToShow = Math.Min(fallenOffInvoices.Count, 6);
+            int maxToShow = Math.Min(fallenOffInvoices.Count, 3);
 
             for (int i = 0; i < maxToShow; i++)
             {
@@ -828,7 +828,6 @@ namespace KellyCashApp.Workflows
 
                 Console.SetCursorPosition(0, line);
                 Console.Write(new string(' ', Console.WindowWidth - 1));
-                ConsoleUi.ResetPage(0);
             }
 
             Console.SetCursorPosition(0, startLine);
