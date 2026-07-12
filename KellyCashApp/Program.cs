@@ -2,7 +2,6 @@
 using KellyCashApp.Configuration;
 using KellyCashApp.Models;
 using KellyCashApp.Processors;
-using KellyCashApp.Processors.Kelly_Services;
 using KellyCashApp.Processors.Monument;
 using KellyCashApp.Processors.Allegis;
 using KellyCashApp.Processors.Randstad;
@@ -63,22 +62,16 @@ while (true)
 
         bool oirLoading = true;
 
-        // Show the processing message immediately on the main thread.
-        Console.SetCursorPosition(0, promptTop);
-        Console.Write("Importing Open Invoice Report... /   ");
-
         Task oirSpinner = Task.Run(() =>
         {
-            char[] frames = { '-', '\\', '|', '/' };
+            char[] frames = { '/', '-', '\\', '|' };
             int i = 0;
 
             while (oirLoading)
             {
-                Thread.Sleep(120);
-
                 Console.SetCursorPosition(0, promptTop);
-                Console.Write(
-                    $"Importing Open Invoice Report... {frames[i++ % frames.Length]}   ");
+                Console.Write($"Importing Open Invoice Report... {frames[i++ % frames.Length]}   ");
+                Thread.Sleep(120);
             }
         });
 
@@ -181,27 +174,21 @@ while (true)
 
     bool loading = true;
 
-    // Show the processing message immediately.
-    Console.SetCursorPosition(0, promptTop);
-    Console.Write("Processing payment file... /   ");
-
     Task spinner = Task.Run(() =>
     {
-        char[] frames = { '-', '\\', '|', '/' };
+        char[] frames = { '/', '-', '\\', '|' };
         int i = 0;
 
         while (loading)
         {
-            Thread.Sleep(120);
-
             Console.SetCursorPosition(0, promptTop);
-            Console.Write(
-                $"Processing payment file... {frames[i++ % frames.Length]}   ");
+            Console.Write($"Processing payment file... {frames[i++ % frames.Length]}   ");
+            Thread.Sleep(120);
         }
     });
 
     try
-    {
+{
         if (RandstadPayment.IsRandstadFormat(inputPath))
         {
             string randstadOutputPath = RandstadPayment.Process(
@@ -456,7 +443,7 @@ while (true)
         }
 
         // Conditional check for Guidant payments (Re-Routing)
-        if (GuidantPayment.IsGuidantFormat(worksheet))
+    if (GuidantPayment.IsGuidantFormat(worksheet))
         {
             string guidantOutputPath = GuidantPayment.Process(
             workbook,
@@ -505,32 +492,210 @@ while (true)
             continue;
         }
 
-        // No specialized format matched.
-        // Process using standard Kelly logic.
-        string kellyOutputPath = KellyPayment.Process(
-            workbook,
-            worksheet,
-            inputPath,
-            openInvoiceMatches);
 
-        loading = false;
-        spinner.Wait();
+        int headerRow = 13;
 
-        ClearArea(promptTop, 8);
-        Console.SetCursorPosition(0, promptTop);
+        // This is where we will dynamically locate the header columns
+        int weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
+    int contractorColumn = FindColumn(worksheet, headerRow, "Name");
+    int lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
+    int locationDescriptionColumn = FindColumn(worksheet, headerRow, "Location Description");
 
-        Console.WriteLine(
-            "Kelly payment processed successfully.");
+    if (weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1 || locationDescriptionColumn == -1)
+    {
+            loading = false;
+            spinner.Wait();
 
-        Console.WriteLine(
-            $"Updated file saved to: {kellyOutputPath}");
+            Console.WriteLine("Could not find Week Ending Date, Name, Line Total, or Location Description.");
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+    // Normalize worksheet layout by ensuring required automation columns exist
+    // will remain in a consistent position for the downstream processing.
+    NormalizeColumns(worksheet, headerRow, contractorColumn);
+    InsertBlankColumn(worksheet, contractorColumn + 1, "Name_", headerRow);
+
+    // Re-find columns after normalization
+    int invoiceColumn = FindColumnAfter(worksheet, headerRow, "Invoice", contractorColumn);
+    int amountColumn = FindColumnAfter(worksheet, headerRow, "Amount", contractorColumn);
+    int aggregateColumn = FindColumn(worksheet, headerRow, "Aggregate Line Total");
+    int notesColumn = FindColumn(worksheet, headerRow, "Notes");
+
+    weekEndingColumn = FindColumn(worksheet, headerRow, "Week Ending Date");
+    contractorColumn = FindColumn(worksheet, headerRow, "Name");
+    int nameFormattedColumn = FindColumnAfter(worksheet, headerRow, "Name_", contractorColumn);
+    lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
+
+    // Add Concat column after Line Total
+    InsertBlankColumn(worksheet, lineTotalColumn + 1, "Concat", headerRow);
+
+    // Re-finding Line Total after inserting Concat
+    lineTotalColumn = FindColumn(worksheet, headerRow, "Line Total");
+
+    // And finding the new Concat column again for the downstream matching (previously was not added)
+    int concatColumn = FindColumnAfter(worksheet, headerRow, "Concat", lineTotalColumn);
+
+    if (amountColumn == -1 || aggregateColumn == -1 || weekEndingColumn == -1 || contractorColumn == -1 || lineTotalColumn == -1)
+    {
+        Console.WriteLine("Could not find one or more required columns.");
+        Console.WriteLine($"Amount: {amountColumn}");
+        Console.WriteLine($"Week Ending: {weekEndingColumn}");
+        Console.WriteLine($"Contractor Name: {contractorColumn}");
+            loading = false;
+            spinner.Wait();
+
+            Console.WriteLine($"Line Total: {lineTotalColumn}");
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
+    int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? headerRow;
+
+        var nameChanges = Rename.LoadNameChanges();
+
+        for (int row = headerRow + 1; row <= lastRow; row++)
+    {
+        string rawName = worksheet.Cell(row, contractorColumn).GetString().Trim();
+
+        if (string.IsNullOrWhiteSpace(rawName))
+            continue;
+
+            string formattedName = FormatName(rawName);
+            formattedName = Rename.ApplyNameChange(formattedName, nameChanges);
+
+            string formattedWeekEnding = FormatWeekEndingDate(worksheet.Cell(row, weekEndingColumn));
+
+            // Generates composite lookup key used for our automatic OIR invoice matching.
+            string concatValue = $"{formattedName} {formattedWeekEnding}".Trim();
+
+        worksheet.Cell(row, nameFormattedColumn).Value = formattedName;
+        worksheet.Cell(row, concatColumn).Value = concatValue;
+     
+    }
+
+    loading = false;
+    spinner.Wait();
+
+    Console.Write("\r" + new string(' ', 60)); 
+    Console.WriteLine(); 
+
+    Console.WriteLine($"Found Amount column: {amountColumn}");
+    Console.WriteLine($"Found Week Ending column: {weekEndingColumn}");
+    Console.WriteLine($"Found Contractor Name column: {contractorColumn}");
+    Console.WriteLine($"Found Line Total column: {lineTotalColumn}");
+    Console.WriteLine($"Found Aggregate column: {aggregateColumn}");
+
+    // First pass: calculate totals up to last row for each Contractor + Week Ending
+    var totalsByContractorAndWeek = new Dictionary<string, decimal>();
+    var lastRowByContractorAndWeek = new Dictionary<string, int>();
+
+    for (int row = headerRow + 1; row < lastRow; row++)
+    {
+        string contractor = worksheet.Cell(row, contractorColumn).GetString().Trim();
+        string weekEnding = worksheet.Cell(row, weekEndingColumn).GetString().Trim();
+
+        if (string.IsNullOrWhiteSpace(contractor) || string.IsNullOrWhiteSpace(weekEnding))
+            continue;
+
+        decimal lineTotal = GetDecimalValue(worksheet.Cell(row, lineTotalColumn));
+        string key = $"{contractor}|{weekEnding}";
+
+        if (!totalsByContractorAndWeek.ContainsKey(key))
+            totalsByContractorAndWeek[key] = 0;
+
+        totalsByContractorAndWeek[key] += lineTotal;
+        lastRowByContractorAndWeek[key] = row;
+    }
+
+    // Second pass: write aggregate total to the last row for each contractor
+    foreach (var item in totalsByContractorAndWeek)
+    {
+        string key = item.Key;
+        decimal aggregateTotal = item.Value;
+        int targetRow = lastRowByContractorAndWeek[key];
+
+        var cell = worksheet.Cell(targetRow, aggregateColumn);
+
+        cell.Value = aggregateTotal;
+
+        cell.Style = worksheet.Cell(targetRow, lineTotalColumn).Style;
+
+        cell.Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
+
+        // Are credits applied? If so, make negative totals red so MSP can identify
+        if (aggregateTotal < 0)
+        {
+            cell.Style.Font.FontColor = XLColor.Red;
+        }
+            string formattedName = worksheet.Cell(targetRow, nameFormattedColumn).GetString().Trim();
+            string rawWeekEnding = worksheet.Cell(targetRow, weekEndingColumn).GetString().Trim();
+            string formattedWeekEnding = FormatWeekEndingDate(worksheet.Cell(targetRow, weekEndingColumn));
+
+            // Try matching with ±2 day spread
+            if (TryMatchWithDateSpread(formattedName, formattedWeekEnding, openInvoiceMatches, out OirMatch match))
+            {
+            worksheet.Cell(targetRow, invoiceColumn).Value = match.DocumentNumber;
+            worksheet.Cell(targetRow, amountColumn).Value = match.RemainingAmount;
+
+            worksheet.Cell(targetRow, amountColumn).Style =
+                worksheet.Cell(targetRow, lineTotalColumn).Style;
+
+            worksheet.Cell(targetRow, amountColumn).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
+        }
+    }
+
+        string downloadsPath = Settings.GetRemittanceSavePath();
+
+        string companyName = worksheet.Cell(headerRow + 1, locationDescriptionColumn).GetString().Trim();
+
+    if (string.IsNullOrWhiteSpace(companyName))
+    {
+        companyName = "Remittance Payment";
+    }
+
+    companyName = MakeSafeFileName(companyName);
+
+    decimal totalAmount = GetDecimalValue(worksheet.Cell(lastRow, lineTotalColumn));
+    string formattedTotal = totalAmount.ToString("N2", CultureInfo.InvariantCulture);
+
+    // Generate output filename using company name and payment total
+    string outputPath = GetUniqueOutputPath(downloadsPath, $"{companyName} - {formattedTotal}.xlsx");
+
+    int lastColumn = worksheet.LastColumnUsed()?.ColumnNumber() ?? lineTotalColumn;
+
+    if (worksheet.AutoFilter.IsEnabled)
+    {
+        worksheet.AutoFilter.Clear();
+    }
+
+    worksheet.Range(headerRow, 1, lastRow, lastColumn).SetAutoFilter();
+
+    worksheet.Column(invoiceColumn).Width = 16;
+    worksheet.Column(amountColumn).Width = 14;
+    worksheet.Column(aggregateColumn).Width = 20;
+    worksheet.Column(notesColumn).Width = 24;
+    worksheet.Column(nameFormattedColumn).Width = 18;
+    worksheet.Column(concatColumn).Width = 28;
+
+    workbook.SaveAs(outputPath);
+
+        Analytics.LogRemittanceRun($"{companyName} - {formattedTotal}");
+
+
 
         Console.WriteLine();
-        Console.WriteLine(
-            "Press 'Enter' to process another payment.");
+    Console.WriteLine("Week-Ending Line Totals Calculated Per Invoice Line Item");
+    Console.WriteLine("All available open invoices have been automatically matched!");
+    Console.WriteLine("\nPress 'Enter' to process another payment.");
+    Console.WriteLine($"Updated file saved to: {outputPath}");
 
-        Thread.Sleep(1000);
-
+        Thread.Sleep(1000); 
         defaultMenuOption = 1;
         continue;
     }
