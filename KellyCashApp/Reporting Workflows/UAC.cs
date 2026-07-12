@@ -51,7 +51,11 @@ namespace KellyCashApp.Workflows
                     while (loading)
                     {
                         Console.SetCursorPosition(0, promptTop);
-                        Console.Write($"Preparing Full Cash Report... {frames[i++ % frames.Length]}   ");
+                        string message =
+                            $"Preparing Full Cash Report... {frames[i++ % frames.Length]}";
+
+                        Console.SetCursorPosition(0, promptTop);
+                        Console.Write(message.PadRight(Console.WindowWidth - 1));
                         Thread.Sleep(120);
                     }
                 });
@@ -73,9 +77,6 @@ namespace KellyCashApp.Workflows
 
                 ShowNewPaymentsLog(newPayments);
 
-                Console.WriteLine($"Saved to: {outputPath}");
-                Console.WriteLine();
-                ShowNewPaymentsLog(newPayments);
                 Console.WriteLine();
                 Console.WriteLine("Press any key to return to menu...");
                 Console.ReadKey(true);
@@ -428,6 +429,7 @@ namespace KellyCashApp.Workflows
 
                 Console.SetCursorPosition(0, line);
                 Console.Write(new string(' ', Console.WindowWidth - 1));
+                ConsoleUi.ResetPage(0);
             }
 
             Console.SetCursorPosition(0, startLine);

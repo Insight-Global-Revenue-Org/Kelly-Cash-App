@@ -89,7 +89,11 @@ namespace KellyCashApp.Workflows
                     while (loading)
                     {
                         Console.SetCursorPosition(0, promptTop);
-                        Console.Write($"Preparing Open Invoice Report... {frames[i++ % frames.Length]}   ");
+                        string message =
+                            $"Preparing Open Invoice Report... {frames[i++ % frames.Length]}";
+
+                        Console.SetCursorPosition(0, promptTop);
+                        Console.Write(message.PadRight(Console.WindowWidth - 1));
                         Thread.Sleep(120);
                     }
                 });
@@ -108,12 +112,9 @@ namespace KellyCashApp.Workflows
                 Console.WriteLine($"Saved to: {outputPath}");
                 Console.WriteLine();
 
-                ShowFallenOffInvoiceMarquee(fallenOffInvoices, newPromptTop + 4);
-
-                Console.WriteLine($"Saved to: {outputPath}");
-                Console.WriteLine();
-
-                ShowFallenOffInvoiceMarquee(fallenOffInvoices, promptTop + 4);
+                ShowFallenOffInvoiceMarquee(
+                    fallenOffInvoices,
+                    newPromptTop + 4);
 
                 Console.WriteLine();
                 Console.WriteLine("Press any key to return to menu...");
@@ -827,6 +828,7 @@ namespace KellyCashApp.Workflows
 
                 Console.SetCursorPosition(0, line);
                 Console.Write(new string(' ', Console.WindowWidth - 1));
+                ConsoleUi.ResetPage(0);
             }
 
             Console.SetCursorPosition(0, startLine);
