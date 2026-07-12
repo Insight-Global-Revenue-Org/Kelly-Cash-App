@@ -39,7 +39,6 @@ namespace KellyCashApp.Processors.Guidant
             string downloadsPath = Settings.GetRemittanceSavePath();
             // If the downloads path is not set, throw an exception
             string formattedTotal = totalAcrossAllSheets.ToString("N2", CultureInfo.InvariantCulture);
-            // If the downloads path is not set, throw an exception
             string outputPath = GetUniqueOutputPath(
                 downloadsPath,
                 $"Guidant - {formattedTotal}.xlsx"

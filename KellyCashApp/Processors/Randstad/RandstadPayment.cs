@@ -11,8 +11,10 @@ namespace KellyCashApp.Processors.Randstad
 {
     internal class RandstadPayment
     {
+        // Primary Process Tree for the Randstad payment workflow - Extract PDF text, format from CSV and generating the Excel output file.
         public static bool IsRandstadFormat(string inputPath)
         {
+            // Check if the file has a .pdf extension (case-insensitive)
             return Path.GetExtension(inputPath)
                 .Equals(".pdf", StringComparison.OrdinalIgnoreCase);
         }
@@ -22,8 +24,10 @@ namespace KellyCashApp.Processors.Randstad
                  Dictionary<string, OirMatch> openInvoiceMatches,
                  Dictionary<string, List<OirMatch>> openInvoiceMatchesByClientProject)
         {
+            // Initialize a list to hold the output rows
             var outputRows = new List<RandstadOutputRow>();
 
+            // Get the path to the Nike Tracker board file from settings
             string nikeTrackerPath = Settings.GetNikeTrackerBoardFilePath();
 
             // Open using PDF Library
@@ -35,9 +39,11 @@ namespace KellyCashApp.Processors.Randstad
                 // Extract all plain text from the PDF! Parsing logic is below
                 string text = page.Text;
 
+                // Regex pattern to match amounts in the format of $1,234.56 or ($1,234.56)
                 string amountPattern = @"(?:-?\s*\$?[\d,]+\.\d{2}|\(\s*\$?[\d,]+\.\d{2}\s*\))";
 
                 // REGEX Parser
+                // A (very) complex regex pattern to match lines in the text that start with "Other", followed by an invoice number, a date, a name, and amounts for gross, discount (optional), and paid. It captures these values into named groups which we'll pull into the output file :)
                 var matches = Regex.Matches(
                     text,
                     $@"Other\s+(?<invoice>\d+)\s+(?<date>\d{{1,2}}/\d{{1,2}}/\d{{2,4}})\s+(?<name>.+?)\s+(?<gross>{amountPattern})(?:\s+(?<discount>{amountPattern}))?\s+(?<paid>{amountPattern})(?=\s*Other\s+\d+|\s*Deposit Totals|$)");
@@ -45,24 +51,27 @@ namespace KellyCashApp.Processors.Randstad
                 // And for each matched row, extract everything
                 foreach (Match match in matches)
                 {
+                    // Extract the captured groups from the regex match
                     string invoiceNumber = match.Groups["invoice"].Value.Trim();
                     string formattedDate = FormatDate(match.Groups["date"].Value.Trim());
                     string name = FormatName(match.Groups["name"].Value.Trim());
                     decimal paidAmount = GetDecimalValue(match.Groups["paid"].Value);
-
+                    // Create a concatenated string for matching purposes
                     string concat = $"{name} {formattedDate}";
                     string beelineId = GetBeelineId(name);
-
+                    // Initialize variables for invoice, amount due, and client project
                     string invoice = "";
                     decimal amountDue = 0;
                     string clientProject = "";
 
+                    // Attempt to match the name and date with the open invoice matches, allowing for a date tolerance of +/- 2 days
                     if (TryMatchWithDateTolerance(name, formattedDate, openInvoiceMatches, out OirMatch oirMatch))
                     {
                         invoice = oirMatch.DocumentNumber;
                         amountDue = oirMatch.RemainingAmount;
                     }
 
+                    // If the Beeline ID and Nike Tracker path are available, attempt to find the best match in the Nike Tracker
                     if (!string.IsNullOrWhiteSpace(beelineId) &&
                     !string.IsNullOrWhiteSpace(nikeTrackerPath))
                     {
@@ -73,6 +82,7 @@ namespace KellyCashApp.Processors.Randstad
                             paidAmount
                         );
 
+                        // If a match is found and the client project name exists in the open invoice matches by client project, set the client project for the output row
                         if (nikeMatch != null &&
                             openInvoiceMatchesByClientProject.TryGetValue(nikeMatch.ClientProjectName, out List<OirMatch>? projectMatches))
                         {
@@ -80,6 +90,7 @@ namespace KellyCashApp.Processors.Randstad
                         }
                     }
 
+                    // Add the extracted and processed data to the output rows list
                     outputRows.Add(new RandstadOutputRow
                     {
                         WeekEndingDate = formattedDate,
@@ -95,16 +106,18 @@ namespace KellyCashApp.Processors.Randstad
                     });
                 }
             }
-
+            
             ApplyGroupedSowMatching(outputRows, openInvoiceMatchesByClientProject);
             outputRows = outputRows
                     .OrderBy(x => x.Name)
                     .ThenBy(x => x.WeekEndingDate)
                     .ThenBy(x => x.InvoiceNumber)
                     .ToList();
+            // Generate the Excel output file using ClosedXML
             using var workbook = new XLWorkbook();
             var worksheet = workbook.Worksheets.Add("Randstad Payment");
 
+            // Define the headers for the Excel sheet
             string[] headers =
             {
                 "Week Ending Date",
@@ -119,9 +132,11 @@ namespace KellyCashApp.Processors.Randstad
                 "Client Project"
             };
 
+            // Write the headers to the first row of the worksheet
             for (int col = 1; col <= headers.Length; col++)
                 worksheet.Cell(1, col).Value = headers[col - 1];
 
+            // Write the output rows to the worksheet starting from the second row
             for (int i = 0; i < outputRows.Count; i++)
             {
                 int row = i + 2;
@@ -138,23 +153,28 @@ namespace KellyCashApp.Processors.Randstad
                 worksheet.Cell(row, 9).Value = item.BeelineId;
                 worksheet.Cell(row, 10).Value = item.ClientProject;
             }
-
+            
             ApplyFormatting(worksheet, outputRows.Count + 1, headers.Length);
 
+            // Save the workbook to a unique output path in the downloads folder
             string downloadsPath = Settings.GetRemittanceSavePath();
             decimal total = outputRows.Sum(x => x.AggregateAmountPaid);
             string formattedTotal = total.ToString("$#,##0.00;($#,##0.00)", CultureInfo.InvariantCulture);
             string processedDate = DateTime.Now.ToString("M.d.yyyy", CultureInfo.InvariantCulture);
 
+            // Generate a unique output path for the Excel file to avoid overwriting existing files
             string outputPath = GetUniqueOutputPath(downloadsPath, $"Randstad {processedDate} - {formattedTotal}.xlsx");
 
+            // Now finally save it!!!
             workbook.SaveAs(outputPath);
 
+            // Logging for the Analytics class
             Analytics.LogRemittanceRun($"Randstad - {formattedTotal}");
 
             return outputPath;
         }
 
+        // Helper function to apply grouped SOW matching logic to the output rows based on client project matches
         private static void ApplyGroupedSowMatching(
                     List<RandstadOutputRow> outputRows,
                     Dictionary<string, List<OirMatch>> openInvoiceMatchesByClientProject)
@@ -172,6 +192,7 @@ namespace KellyCashApp.Processors.Randstad
                     x.ClientProject
                 });
 
+            // For each group of SOWs, attempt to find the best match in the open invoice matches by client project
             foreach (var group in sowGroups)
             {
                 var rows = group.ToList();
@@ -191,37 +212,45 @@ namespace KellyCashApp.Processors.Randstad
             }
         }
 
+        // Helper function to attempt to apply a match between a group of rows and the available project matches based on the allowed percent difference
         private static void TryApplyMatch(
-    List<RandstadOutputRow> rows,
-    List<OirMatch> projectMatches,
-    HashSet<string> usedInvoices,
-    decimal allowedPercentDifference)
+            List<RandstadOutputRow> rows,
+            List<OirMatch> projectMatches,
+            HashSet<string> usedInvoices,
+            decimal allowedPercentDifference)
         {
             if (rows.Count == 0)
                 return;
 
+            // Calculate the total paid amount for the group of rows
             decimal groupedPaidAmount = rows.Sum(x => x.AggregateAmountPaid);
 
+            // Find the best match in the project matches that hasn't already been used and is closest to the grouped paid amount
             OirMatch? bestOirMatch = projectMatches
                 .Where(x => !usedInvoices.Contains(x.DocumentNumber))
                 .OrderBy(x => Math.Abs(x.RemainingAmount - groupedPaidAmount))
                 .FirstOrDefault();
 
+            // If no suitable match is found or the best match is not within the allowed percent difference, return without applying any changes
             if (bestOirMatch == null)
                 return;
 
+            // Check if the grouped paid amount is within the allowed percent difference of the best match's remaining amount
             if (!IsWithinPercent(groupedPaidAmount, bestOirMatch.RemainingAmount, allowedPercentDifference))
                 return;
 
+            // If a suitable match is found, apply the match to all rows in the group by setting the invoice number and amount due
             foreach (var row in rows)
             {
                 row.Invoice = bestOirMatch.DocumentNumber;
                 row.AmountDue = bestOirMatch.RemainingAmount;
             }
 
+            // Mark the matched invoice as used to prevent it from being matched again in future iterations
             usedInvoices.Add(bestOirMatch.DocumentNumber);
         }
 
+        // Helper function to generate all combinations of a specified size from a list of items
         private static List<List<T>> GetCombinations<T>(List<T> items, int size)
         {
             var results = new List<List<T>>();
@@ -234,6 +263,7 @@ namespace KellyCashApp.Processors.Randstad
                     return;
                 }
 
+                // Loop through the items starting from the current index and recursively build combinations
                 for (int i = start; i < items.Count; i++)
                 {
                     current.Add(items[i]);
@@ -242,10 +272,12 @@ namespace KellyCashApp.Processors.Randstad
                 }
             }
 
+            // Start the recursive building of combinations
             Build(0, new List<T>());
             return results;
         }
 
+        // Helper function to apply formatting to the Excel worksheet, including font styles, borders, alignment, and conditional formatting based on the data
         private static void ApplyFormatting(IXLWorksheet worksheet, int lastRow, int lastColumn)
         {
             var range = worksheet.Range(1, 1, lastRow, lastColumn);
@@ -262,6 +294,7 @@ namespace KellyCashApp.Processors.Randstad
             worksheet.Column(4).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
             worksheet.Column(5).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
 
+            // Apply conditional formatting based on the data in the worksheet
             for (int row = 2; row <= lastRow; row++)
             {
                 string invoice = worksheet.Cell(row, 3).GetString().Trim();
@@ -285,6 +318,7 @@ namespace KellyCashApp.Processors.Randstad
                 }
             }
 
+            // Adjust column widths to fit the contents of the cells
             worksheet.Columns().AdjustToContents();
 
             worksheet.Column(3).Width = 18; // Invoice
@@ -293,6 +327,7 @@ namespace KellyCashApp.Processors.Randstad
             worksheet.Range(1, 1, lastRow, lastColumn).SetAutoFilter();
         }
 
+        // Helper function to format a date string into "MM/dd/yyyy" format, returning the original value if parsing fails
         private static string FormatDate(string value)
         {
             if (DateTime.TryParse(value, out DateTime date))
@@ -301,6 +336,7 @@ namespace KellyCashApp.Processors.Randstad
             return value;
         }
 
+        // Helper function to format a name string, converting it to "First Last" format and applying title case
         private static string FormatName(string input)
         {
             if (!input.Contains(","))
@@ -314,6 +350,7 @@ namespace KellyCashApp.Processors.Randstad
             return $"{first} {last}".Trim();
         }
 
+        // Helper function to extract the Beeline ID from a name string using regex, returning an empty string if no match is found
         private static string GetBeelineId(string name)
         {
             var match = Regex.Match(name, @"^(?<id>\d+)_\d+\s+Sow$", RegexOptions.IgnoreCase);
@@ -324,6 +361,7 @@ namespace KellyCashApp.Processors.Randstad
             return "";
         }
 
+        // Helper function to attempt to match a name and date with the open invoice matches, allowing for a date tolerance of +/- 2 days. It returns true if a match is found and outputs the matched OirMatch.
         private static bool TryMatchWithDateTolerance(
             string name,
             string formattedDate,
@@ -340,12 +378,10 @@ namespace KellyCashApp.Processors.Randstad
             if (openInvoiceMatches.TryGetValue(exactKey, out match))
                 return true;
 
-           
             string minusOne = $"{name} {baseDate.AddDays(-1):MM/dd/yyyy}";
             if (openInvoiceMatches.TryGetValue(minusOne, out match))
                 return true;
-
-           
+  
             string plusOne = $"{name} {baseDate.AddDays(1):MM/dd/yyyy}";
             if (openInvoiceMatches.TryGetValue(plusOne, out match))
                 return true;
@@ -358,10 +394,10 @@ namespace KellyCashApp.Processors.Randstad
             if (openInvoiceMatches.TryGetValue(minusTwo, out match))
                 return true;
 
-
             return false;
         }
 
+        // Helper function to convert a string to title case using the current culture's text info
         private static string ToTitle(string value)
         {
             return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value.ToLower());
@@ -379,6 +415,7 @@ namespace KellyCashApp.Processors.Randstad
             return percentDifference <= allowedPercentDifference;
         }
 
+        // Helper function to parse a string value into a decimal, removing any currency symbols and commas. Returns 0 if parsing fails.
         private static decimal GetDecimalValue(string value)
         {
             string raw = value.Replace("$", "").Replace(",", "").Trim();
@@ -390,6 +427,7 @@ namespace KellyCashApp.Processors.Randstad
             return 0;
         }
 
+        // Helper function to generate a unique output path for the Excel file in the specified folder, appending a counter if a file with the same name already exists
         private static string GetUniqueOutputPath(string folderPath, string fileName)
         {
             string name = Path.GetFileNameWithoutExtension(fileName);
@@ -407,6 +445,7 @@ namespace KellyCashApp.Processors.Randstad
             return path;
         }
 
+        // represents a match found in our Randstad vars. initiated to null (rows of output data manipulated and stored in memory for the Excel output file)
         private class RandstadOutputRow
         {
             public string WeekEndingDate { get; set; } = "";
