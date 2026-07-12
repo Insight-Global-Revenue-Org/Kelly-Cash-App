@@ -63,16 +63,22 @@ while (true)
 
         bool oirLoading = true;
 
+        // Show the processing message immediately on the main thread.
+        Console.SetCursorPosition(0, promptTop);
+        Console.Write("Importing Open Invoice Report... /   ");
+
         Task oirSpinner = Task.Run(() =>
         {
-            char[] frames = { '/', '-', '\\', '|' };
+            char[] frames = { '-', '\\', '|', '/' };
             int i = 0;
 
             while (oirLoading)
             {
-                Console.SetCursorPosition(0, promptTop);
-                Console.Write($"Importing Open Invoice Report... {frames[i++ % frames.Length]}   ");
                 Thread.Sleep(120);
+
+                Console.SetCursorPosition(0, promptTop);
+                Console.Write(
+                    $"Importing Open Invoice Report... {frames[i++ % frames.Length]}   ");
             }
         });
 
@@ -175,16 +181,22 @@ while (true)
 
     bool loading = true;
 
+    // Show the processing message immediately.
+    Console.SetCursorPosition(0, promptTop);
+    Console.Write("Processing payment file... /   ");
+
     Task spinner = Task.Run(() =>
     {
-        char[] frames = { '/', '-', '\\', '|' };
+        char[] frames = { '-', '\\', '|', '/' };
         int i = 0;
 
         while (loading)
         {
-            Console.SetCursorPosition(0, promptTop);
-            Console.Write($"Processing payment file... {frames[i++ % frames.Length]}   ");
             Thread.Sleep(120);
+
+            Console.SetCursorPosition(0, promptTop);
+            Console.Write(
+                $"Processing payment file... {frames[i++ % frames.Length]}   ");
         }
     });
 
