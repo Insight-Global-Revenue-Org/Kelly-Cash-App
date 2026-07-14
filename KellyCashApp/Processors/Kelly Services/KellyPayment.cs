@@ -125,6 +125,33 @@ namespace KellyCashApp.Processors.Kelly_Services
                 "Concat",
                 lineTotalColumn);
 
+            // Re-find all source columns that may have shifted
+            // after inserting the formatted output columns.
+            contractorColumn = FindColumn(
+                worksheet,
+                headerRow,
+                "Name");
+
+            weekEndingColumn = FindColumn(
+                worksheet,
+                headerRow,
+                "Week Ending Date");
+
+            lineTotalColumn = FindColumn(
+                worksheet,
+                headerRow,
+                "Line Total");
+
+            userChar1Column = FindColumn(
+                worksheet,
+                headerRow,
+                "User Char 1");
+
+            locationDescriptionColumn = FindColumn(
+                worksheet,
+                headerRow,
+                "Location Description");
+
             if (invoiceColumn == -1 ||
                 amountColumn == -1 ||
                 aggregateColumn == -1 ||
