@@ -274,6 +274,9 @@ namespace KellyCashApp.Processors.Kelly_Services
             var lastRowByContractorAndWeek =
                 new Dictionary<string, int>();
 
+            var matchedInvoiceNumbers =
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
             // Include the final used row.
             for (int row = headerRow + 1; row <= lastRow; row++)
             {
@@ -354,10 +357,13 @@ namespace KellyCashApp.Processors.Kelly_Services
                     isLabor,
                     aggregateTotal,
                     openInvoiceMatches,
+                    matchedInvoiceNumbers,
                     out OirMatch? match))
                 {
                     continue;
                 }
+
+                matchedInvoiceNumbers.Add(match.DocumentNumber);
 
                 worksheet.Cell(targetRow, invoiceColumn).Value =
                     match.DocumentNumber;
@@ -611,12 +617,13 @@ namespace KellyCashApp.Processors.Kelly_Services
         }
 
         private static bool TryMatchWithDateSpread(
-            string formattedName,
-            string formattedWeekEnding,
-            bool isLabor,
-            decimal aggregateAmount,
-            Dictionary<string, OirMatch> openInvoiceMatches,
-            out OirMatch? match)
+     string formattedName,
+     string formattedWeekEnding,
+     bool isLabor,
+     decimal aggregateAmount,
+     Dictionary<string, OirMatch> openInvoiceMatches,
+     HashSet<string> matchedInvoiceNumbers,
+     out OirMatch? match)
         {
             match = null;
 
@@ -627,9 +634,79 @@ namespace KellyCashApp.Processors.Kelly_Services
                 return false;
             }
 
-            int spread = isLabor ? 2 : 7;
+            // Labor keeps its existing ±2-day search and does not require
+            // an amount comparison.
+            if (isLabor)
+            {
+                return TryFindMatchInRange(
+                    formattedName,
+                    baseDate,
+                    startOffset: -2,
+                    endOffset: 2,
+                    requireExactAmount: false,
+                    aggregateAmount,
+                    openInvoiceMatches,
+                    matchedInvoiceNumbers,
+                    out match);
+            }
 
-            for (int offset = -spread; offset <= spread; offset++)
+            // Expense pass 1: search within ±7 days for an exact amount.
+            if (TryFindMatchInRange(
+                formattedName,
+                baseDate,
+                startOffset: -7,
+                endOffset: 7,
+                requireExactAmount: true,
+                aggregateAmount,
+                openInvoiceMatches,
+                matchedInvoiceNumbers,
+                out match))
+            {
+                return true;
+            }
+
+            // Expense pass 2: search only the additional five days,
+            // expanding the total range from ±7 to ±12.
+            if (TryFindMatchInRange(
+                formattedName,
+                baseDate,
+                startOffset: -12,
+                endOffset: -8,
+                requireExactAmount: true,
+                aggregateAmount,
+                openInvoiceMatches,
+                matchedInvoiceNumbers,
+                out match))
+            {
+                return true;
+            }
+
+            return TryFindMatchInRange(
+                formattedName,
+                baseDate,
+                startOffset: 8,
+                endOffset: 12,
+                requireExactAmount: true,
+                aggregateAmount,
+                openInvoiceMatches,
+                matchedInvoiceNumbers,
+                out match);
+        }
+
+        private static bool TryFindMatchInRange(
+            string formattedName,
+            DateTime baseDate,
+            int startOffset,
+            int endOffset,
+            bool requireExactAmount,
+            decimal aggregateAmount,
+            Dictionary<string, OirMatch> openInvoiceMatches,
+            HashSet<string> matchedInvoiceNumbers,
+            out OirMatch? match)
+        {
+            match = null;
+
+            for (int offset = startOffset; offset <= endOffset; offset++)
             {
                 DateTime testDate = baseDate.AddDays(offset);
 
@@ -640,30 +717,26 @@ namespace KellyCashApp.Processors.Kelly_Services
                 string testKey =
                     $"{formattedName} {testDateString}".Trim();
 
-                if (openInvoiceMatches.TryGetValue(
+                if (!openInvoiceMatches.TryGetValue(
                     testKey,
                     out OirMatch? foundMatch))
                 {
-                    // Labor rows only care about the date spread.
-                    if (isLabor)
-                    {
-                        match = foundMatch;
-                        return true;
-                    }
-
-                    // Expense rows must also be within 5%.
-                    decimal difference =
-                        Math.Abs(foundMatch.RemainingAmount - aggregateAmount);
-
-                    decimal tolerance =
-                        Math.Abs(aggregateAmount) * 0.05m;
-
-                    if (difference <= tolerance)
-                    {
-                        match = foundMatch;
-                        return true;
-                    }
+                    continue;
                 }
+
+                if (matchedInvoiceNumbers.Contains(foundMatch.DocumentNumber))
+                {
+                    continue;
+                }
+
+                if (requireExactAmount &&
+                    foundMatch.RemainingAmount != aggregateAmount)
+                {
+                    continue;
+                }
+
+                match = foundMatch;
+                return true;
             }
 
             return false;
