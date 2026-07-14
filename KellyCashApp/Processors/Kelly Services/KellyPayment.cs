@@ -269,10 +269,10 @@ namespace KellyCashApp.Processors.Kelly_Services
             Dictionary<string, OirMatch> openInvoiceMatches)
         {
             var totalsByContractorAndWeek =
-                new Dictionary<string, decimal>();
+                new Dictionary<(string Contractor, string WeekEnding, bool IsLabor), decimal>();
 
             var lastRowByContractorAndWeek =
-                new Dictionary<string, int>();
+                new Dictionary<(string Contractor, string WeekEnding, bool IsLabor), int>();
 
             var matchedInvoiceNumbers =
                 new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -299,7 +299,20 @@ namespace KellyCashApp.Processors.Kelly_Services
                 decimal lineTotal = GetDecimalValue(
                     worksheet.Cell(row, lineTotalColumn));
 
-                string key = $"{contractor}|{weekEnding}";
+                string userChar1 = worksheet
+                    .Cell(row, userChar1Column)
+                    .GetString()
+                    .Trim();
+
+                bool isLabor = userChar1.StartsWith(
+                    "LABOR",
+                    StringComparison.OrdinalIgnoreCase);
+
+                var key = (
+                    Contractor: contractor,
+                    WeekEnding: weekEnding,
+                    IsLabor: isLabor
+                );
 
                 if (!totalsByContractorAndWeek.ContainsKey(key))
                 {
@@ -312,9 +325,11 @@ namespace KellyCashApp.Processors.Kelly_Services
 
             foreach (var item in totalsByContractorAndWeek)
             {
-                string key = item.Key;
+                var key = item.Key;
                 decimal aggregateTotal = item.Value;
                 int targetRow = lastRowByContractorAndWeek[key];
+
+                bool isLabor = key.IsLabor;
 
                 IXLCell aggregateCell =
                     worksheet.Cell(targetRow, aggregateColumn);
@@ -340,16 +355,6 @@ namespace KellyCashApp.Processors.Kelly_Services
 
                 string formattedWeekEnding = FormatWeekEndingDate(
                     worksheet.Cell(targetRow, weekEndingColumn));
-
-                string userChar1 = worksheet
-                    .Cell(targetRow, userChar1Column)
-                    .GetString()
-                    .Trim();
-
-                bool isLabor =
-                    userChar1.Trim()
-                    .StartsWith("LABOR",
-                 StringComparison.OrdinalIgnoreCase);
 
                 if (!TryMatchWithDateSpread(
                     formattedName,
