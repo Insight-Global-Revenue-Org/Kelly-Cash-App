@@ -20,7 +20,23 @@
         Console.CursorVisible = true;
     }
 
-    // <summary> test
+    public static void PauseAndReset(
+    string message = "Press any key to continue...",
+    bool redrawHeader = true)
+    {
+        Console.WriteLine();
+        Console.WriteLine(message);
+        Console.ReadKey(intercept: true);
+
+        ResetPage(0);
+
+        if (redrawHeader)
+        {
+            DrawHeader();
+        }
+    }
+
+    // <summary>
     public static int DrawHeader()
     {
         Console.ForegroundColor = ConsoleColor.White;

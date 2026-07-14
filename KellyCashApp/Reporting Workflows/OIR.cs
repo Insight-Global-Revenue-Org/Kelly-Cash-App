@@ -50,12 +50,7 @@ namespace KellyCashApp.Workflows
             if (string.IsNullOrWhiteSpace(newOirPath) || !File.Exists(newOirPath))
             {
                 Console.WriteLine("File not found. Please check the NEW OIR path.");
-                Console.WriteLine("Press any key to return...");
-                Console.ReadKey(true);
-
-                // Reset the entire screen before returning
-                ConsoleUi.ResetPage(0);
-                ConsoleUi.DrawHeader();
+                ConsoleUi.PauseAndReset("Press any key to return...");
                 return;
             }
 
@@ -67,12 +62,7 @@ namespace KellyCashApp.Workflows
             if (string.IsNullOrWhiteSpace(oldOirPath) || !File.Exists(oldOirPath))
             {
                 Console.WriteLine("File not found. Please check the OLD OIR path.");
-                Console.WriteLine("Press any key to return...");
-                Console.ReadKey(true);
-
-                // Reset the entire screen before returning
-                ConsoleUi.ResetPage(0);
-                ConsoleUi.DrawHeader();
+                ConsoleUi.PauseAndReset("Press any key to return...");
                 return;
             }
 
@@ -116,9 +106,7 @@ namespace KellyCashApp.Workflows
                 // Let the console continue naturally from its current position.
                 ShowFallenOffInvoiceMarquee(fallenOffInvoices);
 
-                Console.WriteLine();
-                Console.WriteLine("Press any key to return to menu...");
-                Console.ReadKey(true);
+                ConsoleUi.PauseAndReset("Press any key to return to menu...");
             }
             catch (Exception ex)
             {
@@ -127,13 +115,8 @@ namespace KellyCashApp.Workflows
 
                 Console.WriteLine("Something went wrong while preparing the OIR:");
                 Console.WriteLine(ex.Message);
-                Console.WriteLine();
-                Console.WriteLine("Press any key to return...");
-                Console.ReadKey(true);
 
-                // Reset the entire screen before returning
-                ConsoleUi.ResetPage(0);
-                ConsoleUi.DrawHeader();
+                ConsoleUi.PauseAndReset("Press any key to return...");
             }
         }
 
