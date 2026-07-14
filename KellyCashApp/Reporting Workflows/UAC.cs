@@ -16,9 +16,10 @@ namespace KellyCashApp.Workflows
 
             if (string.IsNullOrWhiteSpace(newUacPath) || !File.Exists(newUacPath))
             {
-                Console.WriteLine("File not found. Please check the NEW Full Cash Report path.");
-                Console.WriteLine("Press any key to return...");
-                Console.ReadKey(true);
+                Console.WriteLine(
+                    "File not found. Please check the NEW Full Cash Report path.");
+
+                ConsoleUi.PauseAndReset("Press any key to return...");
                 return;
             }
 
@@ -29,13 +30,10 @@ namespace KellyCashApp.Workflows
 
             if (string.IsNullOrWhiteSpace(oldUacPath) || !File.Exists(oldUacPath))
             {
-                Console.WriteLine("File not found. Please check the OLD Full Cash Report path.");
-                Console.WriteLine("Press any key to return...");
-                Console.ReadKey(true);
+                Console.WriteLine(
+                    "File not found. Please check the OLD Full Cash Report path.");
 
-                // Reset the entire screen before returning
-                ConsoleUi.ResetPage(0);
-                ConsoleUi.DrawHeader();
+                ConsoleUi.PauseAndReset("Press any key to return...");
                 return;
             }
 
@@ -77,24 +75,19 @@ namespace KellyCashApp.Workflows
 
                 ShowNewPaymentsLog(newPayments);
 
-                Console.WriteLine();
-                Console.WriteLine("Press any key to return to menu...");
-                Console.ReadKey(true);
+                ConsoleUi.PauseAndReset("Press any key to return to menu...");
             }
             catch (Exception ex)
             {
                 ConsoleUi.ResetPage(promptTop);
                 Console.SetCursorPosition(0, promptTop);
 
-                Console.WriteLine("Something went wrong while preparing the Full Cash Report:");
-                Console.WriteLine(ex.Message);
-                Console.WriteLine();
-                Console.WriteLine("Press any key to return...");
-                Console.ReadKey(true);
+                Console.WriteLine(
+                    "Something went wrong while preparing the Full Cash Report:");
 
-                // Reset the entire screen before returning
-                ConsoleUi.ResetPage(0);
-                ConsoleUi.DrawHeader();
+                Console.WriteLine(ex.Message);
+
+                ConsoleUi.PauseAndReset("Press any key to return...");
             }
         }
 
@@ -425,11 +418,12 @@ namespace KellyCashApp.Workflows
             for (int i = 0; i < numberOfLines; i++)
             {
                 int line = startLine + i;
-                if (line < 0 || line >= Console.BufferHeight) continue;
+
+                if (line < 0 || line >= Console.BufferHeight)
+                    continue;
 
                 Console.SetCursorPosition(0, line);
                 Console.Write(new string(' ', Console.WindowWidth - 1));
-                ConsoleUi.ResetPage(0);
             }
 
             Console.SetCursorPosition(0, startLine);
