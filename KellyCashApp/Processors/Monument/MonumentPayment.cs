@@ -341,6 +341,32 @@ namespace KellyCashApp.Processors.Monument
             // After aggregating the contractor rows, we replace the original outputRows list with the aggregatedOutputRows list, which now contains both non-contractor rows and aggregated contractor rows.
             outputRows = aggregatedOutputRows;
 
+            // If an exact contractor/week-ending-date match was not found,
+            // search the same contractor within a +/- 2 day window and select
+            // the closest amount match, provided it is within a 10% variance.
+            foreach (MonumentOutputRow row in outputRows)
+            {
+                if (!row.IsContractor
+                    || !string.IsNullOrWhiteSpace(row.Invoice)
+                    || string.IsNullOrWhiteSpace(row.Name)
+                    || string.IsNullOrWhiteSpace(row.WeekEndingDate))
+                {
+                    continue;
+                }
+
+                if (TryFindClosestOirMatch(
+                    row.Name,
+                    row.WeekEndingDate,
+                    row.AggregateAmountPaid,
+                    openInvoiceMatches,
+                    out OirMatch fallbackMatch))
+                {
+                    row.Invoice = fallbackMatch.DocumentNumber;
+                    row.AmountDue = fallbackMatch.RemainingAmount;
+                    row.Notes = "Matched within ±2 days and 10% amount variance";
+                }
+            }
+
             // self-explanatory
             worksheet.Clear();
 
@@ -416,6 +442,117 @@ namespace KellyCashApp.Processors.Monument
                 );
 
             return sheetTotal;
+        }
+
+        // This method attempts to find the closest matching open invoice (OIR) for a given contractor name, week ending date, and aggregate amount paid. It searches within a specified variance in both date and amount to find the best match.
+        private static bool TryFindClosestOirMatch(
+            string contractorName,
+            string weekEndingDate,
+            decimal aggregateAmountPaid,
+            Dictionary<string, OirMatch> openInvoiceMatches,
+            out OirMatch closestMatch)
+        {
+            closestMatch = null!;
+
+            if (!DateTime.TryParse(
+                weekEndingDate,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out DateTime monumentDate))
+            {
+                return false;
+            }
+
+            decimal targetAmount = Math.Abs(aggregateAmountPaid);
+
+            if (targetAmount == 0)
+                return false;
+
+            var candidates = new List<(
+                OirMatch Match,
+                decimal AmountDifference,
+                int DateDifference)>();
+
+            foreach (KeyValuePair<string, OirMatch> entry in openInvoiceMatches)
+            {
+                if (!TryParseOirConcatKey(
+                    entry.Key,
+                    out string candidateName,
+                    out DateTime candidateDate))
+                {
+                    continue;
+                }
+
+                // Contractor must still match exactly.
+                if (!candidateName.Equals(
+                    contractorName,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                int dateDifference =
+                    Math.Abs((candidateDate.Date - monumentDate.Date).Days);
+
+                if (dateDifference > 2)
+                    continue;
+
+                decimal candidateAmount =
+                    Math.Abs(entry.Value.RemainingAmount);
+
+                decimal amountDifference =
+                    Math.Abs(candidateAmount - targetAmount);
+
+                decimal allowedVariance = targetAmount * 0.10m;
+
+                if (amountDifference > allowedVariance)
+                    continue;
+
+                candidates.Add((
+                    entry.Value,
+                    amountDifference,
+                    dateDifference));
+            }
+
+            var bestCandidate = candidates
+                .OrderBy(candidate => candidate.AmountDifference)
+                .ThenBy(candidate => candidate.DateDifference)
+                .FirstOrDefault();
+
+            if (bestCandidate.Match is null)
+                return false;
+
+            closestMatch = bestCandidate.Match;
+            return true;
+        }
+
+        // This method attempts to parse a concatenated key string into its constituent parts: contractor name and week ending date. The expected format of the concatenated key is "Contractor Name MM/dd/yyyy".
+        // If parsing is successful, it returns true and outputs the parsed values; otherwise, it returns false.
+        private static bool TryParseOirConcatKey(
+            string concatKey,
+            out string contractorName,
+            out DateTime weekEndingDate)
+        {
+            contractorName = "";
+            weekEndingDate = default;
+
+            if (string.IsNullOrWhiteSpace(concatKey))
+                return false;
+
+            Match match = Regex.Match(
+                concatKey.Trim(),
+                @"^(?<name>.+?)\s+(?<date>\d{1,2}/\d{1,2}/\d{2,4})$");
+
+            if (!match.Success)
+                return false;
+
+            contractorName = match.Groups["name"].Value.Trim();
+
+            return DateTime.TryParse(
+                match.Groups["date"].Value,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out weekEndingDate);
         }
 
         // This method applies clean formatting to the specified range of cells in the worksheet, including font settings, borders, header styling, and number formatting.
