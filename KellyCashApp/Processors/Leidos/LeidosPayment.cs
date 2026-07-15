@@ -27,21 +27,37 @@ namespace KellyCashApp.Processors.Leidos
                     return false;
                 }
 
-                string thirdPageText = document
-                    .GetPage(3)
-                    .Text;
+                string thirdPageText = Regex.Replace(
+                    document.GetPage(3).Text,
+                    @"\s+",
+                    " ");
 
-                return thirdPageText.Contains(
-                           "leidos",
-                           StringComparison.OrdinalIgnoreCase)
-                       &&
-                       thirdPageText.Contains(
-                           "CONTROL NO",
-                           StringComparison.OrdinalIgnoreCase)
-                       &&
-                       thirdPageText.Contains(
-                           "AMOUNT PAID",
-                           StringComparison.OrdinalIgnoreCase);
+                bool hasInvoiceDate = thirdPageText.Contains(
+                    "INVOICE DATE",
+                    StringComparison.OrdinalIgnoreCase);
+
+                bool hasInvoiceNumber = thirdPageText.Contains(
+                    "INVOICE NO",
+                    StringComparison.OrdinalIgnoreCase);
+
+                bool hasControlNumber = thirdPageText.Contains(
+                    "CONTROL NO",
+                    StringComparison.OrdinalIgnoreCase);
+
+                bool hasAmountPaid = thirdPageText.Contains(
+                    "AMOUNT PAID",
+                    StringComparison.OrdinalIgnoreCase);
+
+                bool hasLeidosInvoice = Regex.IsMatch(
+                    thirdPageText,
+                    @"\bSLICS[A-Z0-9\-]+\b",
+                    RegexOptions.IgnoreCase);
+
+                return hasInvoiceDate
+                    && hasInvoiceNumber
+                    && hasControlNumber
+                    && hasAmountPaid
+                    && hasLeidosInvoice;
             }
             catch
             {

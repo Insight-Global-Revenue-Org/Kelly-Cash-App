@@ -14,9 +14,44 @@ namespace KellyCashApp.Processors.Randstad
         // Primary Process Tree for the Randstad payment workflow - Extract PDF text, format from CSV and generating the Excel output file.
         public static bool IsRandstadFormat(string inputPath)
         {
-            // Check if the file has a .pdf extension (case-insensitive)
-            return Path.GetExtension(inputPath)
-                .Equals(".pdf", StringComparison.OrdinalIgnoreCase);
+            if (!Path.GetExtension(inputPath)
+                .Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            try
+            {
+                using PdfDocument document = PdfDocument.Open(inputPath);
+
+                foreach (var page in document.GetPages())
+                {
+                    string text = Regex.Replace(
+                        page.Text,
+                        @"\s+",
+                        " ");
+
+                    bool hasRandstadRows = Regex.IsMatch(
+                        text,
+                        @"\bOther\s+\d+\s+\d{1,2}/\d{1,2}/\d{2,4}\b",
+                        RegexOptions.IgnoreCase);
+
+                    bool hasDepositTotals = text.Contains(
+                        "Deposit Totals",
+                        StringComparison.OrdinalIgnoreCase);
+
+                    if (hasRandstadRows && hasDepositTotals)
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public static string Process(
