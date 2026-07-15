@@ -252,6 +252,28 @@ while (true)
             continue;
         }
 
+        // Exception for PDF files that are not Leidos or Randstad
+        if (Path.GetExtension(inputPath)
+        .Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+        {
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("The PDF format was not recognized as Leidos or Randstad.");
+            Console.ResetColor();
+
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
         using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
         // Open remittance workbook using the installed ClosedXML dependency

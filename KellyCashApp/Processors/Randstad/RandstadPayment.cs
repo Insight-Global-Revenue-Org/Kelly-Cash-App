@@ -24,6 +24,17 @@ namespace KellyCashApp.Processors.Randstad
             {
                 using PdfDocument document = PdfDocument.Open(inputPath);
 
+                string amountPattern =
+                    @"(?:-?\s*\$?[\d,]+\.\d{2}|\(\s*\$?[\d,]+\.\d{2}\s*\))";
+
+                string rowPattern =
+                    $@"Other\s+(?<invoice>\d+)\s+" +
+                    @"(?<date>\d{1,2}/\d{1,2}/\d{2,4})\s+" +
+                    @"(?<name>.+?)\s+" +
+                    $@"(?<gross>{amountPattern})" +
+                    $@"(?:\s+(?<discount>{amountPattern}))?\s+" +
+                    $@"(?<paid>{amountPattern})";
+
                 foreach (var page in document.GetPages())
                 {
                     string text = Regex.Replace(
@@ -31,16 +42,10 @@ namespace KellyCashApp.Processors.Randstad
                         @"\s+",
                         " ");
 
-                    bool hasRandstadRows = Regex.IsMatch(
+                    if (Regex.IsMatch(
                         text,
-                        @"\bOther\s+\d+\s+\d{1,2}/\d{1,2}/\d{2,4}\b",
-                        RegexOptions.IgnoreCase);
-
-                    bool hasDepositTotals = text.Contains(
-                        "Deposit Totals",
-                        StringComparison.OrdinalIgnoreCase);
-
-                    if (hasRandstadRows && hasDepositTotals)
+                        rowPattern,
+                        RegexOptions.IgnoreCase))
                     {
                         return true;
                     }
