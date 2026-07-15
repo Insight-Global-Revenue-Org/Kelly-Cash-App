@@ -86,17 +86,31 @@ namespace KellyCashApp.Processors.Leidos
 
             using PdfDocument document = PdfDocument.Open(inputPath);
 
-            foreach (var page in document.GetPages())
+            if (document.NumberOfPages < 3)
             {
-                string text = NormalizePdfText(page.Text);
+                throw new InvalidOperationException(
+                    "The Leidos PDF does not contain a third page.");
+            }
 
-                /*
-                 * Expected Leidos row:
-                 *
-                 * 05/04/2026 SLICS9000260578 6594246
-                 * $6,279.20 $0.00 $6,279.20
-                 */
-                string amountPattern =
+            var page = document.GetPage(3);
+
+            string rawText = page.Text;
+
+            string debugPath = Path.Combine(
+                Settings.GetRemittanceSavePath(),
+                "Leidos Page 3 Extracted Text.txt");
+
+            File.WriteAllText(debugPath, rawText);
+
+            string text = NormalizePdfText(rawText);
+
+            /*
+             * Expected Leidos row:
+             *
+             * 05/04/2026 SLICS9000260578 6594246
+             * $6,279.20 $0.00 $6,279.20
+             */
+            string amountPattern =
                     @"(?:-?\s*\$?[\d,]+\.\d{2}|\(\s*\$?[\d,]+\.\d{2}\s*\))";
 
                 string rowPattern =
@@ -159,12 +173,13 @@ namespace KellyCashApp.Processors.Leidos
                         Notes = ""
                     });
                 }
-            }
+
 
             if (outputRows.Count == 0)
             {
                 throw new InvalidOperationException(
-                    "No Leidos payment rows were found in the PDF.");
+                    $"No Leidos payment rows were found. " +
+                    $"PdfPig page 3 text was saved to: {debugPath}");
             }
 
             outputRows = outputRows
