@@ -252,20 +252,26 @@ while (true)
             continue;
         }
 
-        // Exception for PDF files that are not Leidos or Randstad
+        // TEMP DEBUG: Treat any remaining PDF as Leidos.
         if (Path.GetExtension(inputPath)
-        .Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+            .Equals(".pdf", StringComparison.OrdinalIgnoreCase))
         {
+            string leidosOutputPath = LeidosPayment.Process(
+                inputPath,
+                openInvoiceMatches
+            );
+
             loading = false;
             spinner.Wait();
 
             ClearArea(promptTop, 8);
             Console.SetCursorPosition(0, promptTop);
 
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("The PDF format was not recognized as Leidos or Randstad.");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("DEBUG: PDF was forced through the Leidos processor.");
             Console.ResetColor();
 
+            Console.WriteLine($"Updated file saved to: {leidosOutputPath}");
             Console.WriteLine();
             Console.WriteLine("Press any key to return to the menu...");
             Console.ReadKey(true);
