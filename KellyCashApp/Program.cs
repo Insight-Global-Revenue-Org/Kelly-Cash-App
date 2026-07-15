@@ -10,6 +10,7 @@ using KellyCashApp.Processors.Guidant;
 using KellyCashApp.Services;
 using KellyCashApp.Workflows;
 using System.Globalization;
+using KellyCashApp.Processors.Leidos;
 
 Console.ForegroundColor = ConsoleColor.White;
 
@@ -202,6 +203,31 @@ while (true)
 
     try
     {
+        // Conditional Check for Leidos first
+        if (LeidosPayment.IsLeidosFormat(inputPath))
+        {
+            string leidosOutputPath = LeidosPayment.Process(
+                inputPath,
+                openInvoiceMatches
+            );
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("Leidos payment processed successfully.");
+            Console.WriteLine($"Updated file saved to: {leidosOutputPath}");
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
+        // Conditional Check for Randstad next
         if (RandstadPayment.IsRandstadFormat(inputPath))
         {
             string randstadOutputPath = RandstadPayment.Process(
