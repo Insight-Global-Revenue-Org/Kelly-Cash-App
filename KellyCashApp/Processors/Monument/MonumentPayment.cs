@@ -363,7 +363,6 @@ namespace KellyCashApp.Processors.Monument
                 {
                     row.Invoice = fallbackMatch.DocumentNumber;
                     row.AmountDue = fallbackMatch.RemainingAmount;
-                    row.Notes = "Matched within ±2 days and 10% amount variance";
                 }
             }
 
