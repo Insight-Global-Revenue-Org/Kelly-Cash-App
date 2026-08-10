@@ -60,9 +60,9 @@ namespace KellyCashApp.Processors.Randstad
         }
 
         public static string Process(
-                string inputPath,
-                 Dictionary<string, OirMatch> openInvoiceMatches,
-                 Dictionary<string, List<OirMatch>> openInvoiceMatchesByClientProject)
+            string inputPath,
+                Dictionary<string, List<OirMatch>> openInvoiceMatches,
+                Dictionary<string, List<OirMatch>> openInvoiceMatchesByClientProject)
         {
             // Initialize a list to hold the output rows
             var outputRows = new List<RandstadOutputRow>();
@@ -104,13 +104,6 @@ namespace KellyCashApp.Processors.Randstad
                     decimal amountDue = 0;
                     string clientProject = "";
 
-                    // Attempt to match the name and date with the open invoice matches, allowing for a date tolerance of +/- 2 days
-                    if (TryMatchWithDateTolerance(name, formattedDate, openInvoiceMatches, out OirMatch oirMatch))
-                    {
-                        invoice = oirMatch.DocumentNumber;
-                        amountDue = oirMatch.RemainingAmount;
-                    }
-
                     // If the Beeline ID and Nike Tracker path are available, attempt to find the best match in the Nike Tracker
                     if (!string.IsNullOrWhiteSpace(beelineId) &&
                     !string.IsNullOrWhiteSpace(nikeTrackerPath))
@@ -147,30 +140,62 @@ namespace KellyCashApp.Processors.Randstad
                 }
             }
 
-            // group these matching line items up
-            ApplyGroupedSowMatching(outputRows, openInvoiceMatchesByClientProject);
+            // First, combine Randstad line items by contractor and week-ending date.
             outputRows = outputRows
-            .GroupBy(x => new
+                .GroupBy(x => new
+                {
+                    x.Name,
+                    x.WeekEndingDate
+                })
+                .Select(g =>
+                {
+                    var first = g.First();
+
+                    first.AggregateAmountPaid = g.Sum(x => x.AggregateAmountPaid);
+
+                    first.InvoiceNumber = string.Join(", ",
+                        g.Select(x => x.InvoiceNumber)
+                         .Where(x => !string.IsNullOrWhiteSpace(x))
+                         .Distinct());
+
+                    first.Concat = $"{first.Name} {first.WeekEndingDate}";
+
+                    first.BeelineId = g
+                        .Select(x => x.BeelineId)
+                        .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "";
+
+                    first.ClientProject = g
+                        .Select(x => x.ClientProject)
+                        .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "";
+
+                    first.Invoice = "";
+                    first.AmountDue = 0;
+
+                    return first;
+                })
+                .ToList();
+
+            // Then, match normal Randstad rows by closest OIR amount within date tolerance.
+            var usedInvoiceNumbers =
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var row in outputRows)
             {
-                x.Name,
-                x.WeekEndingDate
-            })
-            .Select(g =>
-            {
-                var first = g.First();
+                if (TryMatchWithDateToleranceAndClosestAmount(
+                    row.Name,
+                    row.WeekEndingDate,
+                    row.AggregateAmountPaid,
+                    openInvoiceMatches,
+                    usedInvoiceNumbers,
+                    out OirMatch? oirMatch))
+                {
+                    row.Invoice = oirMatch.DocumentNumber;
+                    row.AmountDue = oirMatch.RemainingAmount;
+                    usedInvoiceNumbers.Add(oirMatch.DocumentNumber);
+                }
+            }
 
-                first.AggregateAmountPaid = g.Sum(x => x.AggregateAmountPaid);
-
-        // Combine invoice numbers if desired
-        first.InvoiceNumber = string.Join(", ",
-            g.Select(x => x.InvoiceNumber)
-             .Where(x => !string.IsNullOrWhiteSpace(x))
-             .Distinct());
-
-        return first;
-    })
-    .ToList();
-
+            // Finally, let the grouped SOW logic handle anything still unmatched.
             ApplyGroupedSowMatching(outputRows, openInvoiceMatchesByClientProject);
 
             outputRows = outputRows
@@ -423,6 +448,57 @@ namespace KellyCashApp.Processors.Randstad
                 return match.Groups["id"].Value;
 
             return "";
+        }
+
+        private static bool TryMatchWithDateToleranceAndClosestAmount(
+    string name,
+    string formattedDate,
+    decimal paidAmount,
+    Dictionary<string, List<OirMatch>> openInvoiceMatches,
+    HashSet<string> usedInvoiceNumbers,
+    out OirMatch? match)
+        {
+            match = null;
+
+            if (!DateTime.TryParse(formattedDate, out DateTime baseDate))
+                return false;
+
+            int[] offsets =
+            {
+        0,
+        -1,
+        1,
+        2,
+        -2
+    };
+
+            var possibleMatches = new List<OirMatch>();
+
+            foreach (int offset in offsets)
+            {
+                string testKey =
+                    $"{name} {baseDate.AddDays(offset):MM/dd/yyyy}";
+
+                if (!openInvoiceMatches.TryGetValue(
+                    testKey,
+                    out List<OirMatch>? foundMatches))
+                {
+                    continue;
+                }
+
+                possibleMatches.AddRange(
+                    foundMatches.Where(x =>
+                        !usedInvoiceNumbers.Contains(x.DocumentNumber)));
+            }
+
+            if (possibleMatches.Count == 0)
+                return false;
+
+            match = possibleMatches
+                .OrderBy(x => Math.Abs(x.RemainingAmount - paidAmount))
+                .First();
+
+            return true;
         }
 
         // Helper function to attempt to match a name and date with the open invoice matches, allowing for a date tolerance of +/- 2 days. It returns true if a match is found and outputs the matched OirMatch.

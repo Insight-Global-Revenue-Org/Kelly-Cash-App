@@ -232,7 +232,7 @@ while (true)
         {
             string randstadOutputPath = RandstadPayment.Process(
                 inputPath,
-                openInvoiceMatches,
+                openInvoiceMatchesMultiple,
                 openInvoiceMatchesByClientProject
             );
 
