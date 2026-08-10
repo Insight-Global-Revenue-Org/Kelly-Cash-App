@@ -146,13 +146,37 @@ namespace KellyCashApp.Processors.Randstad
                     });
                 }
             }
-            
+
+            // group these matching line items up
             ApplyGroupedSowMatching(outputRows, openInvoiceMatchesByClientProject);
             outputRows = outputRows
-                    .OrderBy(x => x.Name)
-                    .ThenBy(x => x.WeekEndingDate)
-                    .ThenBy(x => x.InvoiceNumber)
-                    .ToList();
+            .GroupBy(x => new
+            {
+                x.Name,
+                x.WeekEndingDate
+            })
+            .Select(g =>
+            {
+                var first = g.First();
+
+                first.AggregateAmountPaid = g.Sum(x => x.AggregateAmountPaid);
+
+        // Combine invoice numbers if desired
+        first.InvoiceNumber = string.Join(", ",
+            g.Select(x => x.InvoiceNumber)
+             .Where(x => !string.IsNullOrWhiteSpace(x))
+             .Distinct());
+
+        return first;
+    })
+    .ToList();
+
+            ApplyGroupedSowMatching(outputRows, openInvoiceMatchesByClientProject);
+
+            outputRows = outputRows
+                .OrderBy(x => x.Name)
+                .ThenBy(x => x.WeekEndingDate)
+                .ToList();
             // Generate the Excel output file using ClosedXML
             using var workbook = new XLWorkbook();
             var worksheet = workbook.Worksheets.Add("Randstad Payment");
