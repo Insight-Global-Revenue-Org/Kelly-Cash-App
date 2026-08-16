@@ -142,11 +142,18 @@ namespace KellyCashApp.Workflows
                     oldUacPath,
                     missingColumns);
 
-            // Auto-size only the columns that came from the NEW Full Cash Report.
-            // Pulled-forward notation columns are intentionally left unchanged.
+            // Auto-size the columns from the NEW Full Cash Report.
             AutoFitOriginalColumns(
                 worksheet,
                 originalLastColumn);
+
+            // Auto-size pulled-forward notation columns,
+            // but don't allow them to become excessively wide.
+            AutoFitAddedColumns(
+                worksheet,
+                headerRow,
+                missingColumns,
+                maxWidth: 30);
 
             ApplyFinalUacStyling(
                 worksheet,
@@ -439,6 +446,30 @@ namespace KellyCashApp.Workflows
             }
 
             return newPayments.OrderBy(x => x).ToList();
+        }
+
+        private static void AutoFitAddedColumns(
+            IXLWorksheet worksheet,
+            int headerRow,
+            string[] addedColumns,
+            double maxWidth = 30)
+        {
+            foreach (string header in addedColumns)
+            {
+                int column = FindColumn(worksheet, headerRow, header);
+
+                if (column == -1)
+                    continue;
+
+                // First auto-fit based on the contents.
+                worksheet.Column(column).AdjustToContents();
+
+                // Then cap the width if it became too large.
+                if (worksheet.Column(column).Width > maxWidth)
+                {
+                    worksheet.Column(column).Width = maxWidth;
+                }
+            }
         }
 
         private static void AutoFitOriginalColumns(
