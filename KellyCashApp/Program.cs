@@ -20,8 +20,6 @@ var openInvoiceMatches = new Dictionary<string, OirMatch>();
 var openInvoiceMatchesMultiple = new Dictionary<string, List<OirMatch>>();
 var openInvoiceMatchesByClientProject = new Dictionary<string, List<OirMatch>>();
 string? importedOirStatusMessage = null;
-Dictionary<string, List<MicrosoftVmsMatch>>? microsoftVmsMatches = null;
-bool skipMicrosoftVmsPrompt = false;
 
 string? inputPath = null;
 int defaultMenuOption = 0;
@@ -300,6 +298,7 @@ while (true)
         // git-staging setup
         // -------- Main Conditional loop for all Allegis Payments! --------
         // Conditional check for Microsoft payments (Re-Routing)
+        // Conditional check for Microsoft payments
         if (MicrosoftPayment.IsMicrosoftFormat(worksheet))
         {
             loading = false;
@@ -308,65 +307,39 @@ while (true)
             ClearArea(promptTop, 8);
             Console.SetCursorPosition(0, promptTop);
 
-            if (microsoftVmsMatches == null && !skipMicrosoftVmsPrompt)
+            Dictionary<string, List<MicrosoftVmsMatch>>? microsoftVmsMatches = null;
+
+            string microsoftVmsPath = Settings.GetMicrosoftVmsReportFilePath();
+
+            if (!string.IsNullOrWhiteSpace(microsoftVmsPath))
             {
-                Console.WriteLine("Import VMS Timesheet Report? (Yes/No)");
-                Console.Write("> ");
+                bool vmsLoading = true;
 
-                string answer = Console.ReadLine()?.Trim() ?? "";
-
-                if (answer.Equals("No", StringComparison.OrdinalIgnoreCase) ||
-                    answer.Equals("N", StringComparison.OrdinalIgnoreCase))
+                Task vmsSpinner = Task.Run(() =>
                 {
-                    skipMicrosoftVmsPrompt = true;
-                }
+                    char[] frames = { '/', '-', '\\', '|' };
+                    int i = 0;
 
-                if (answer.Equals("Yes", StringComparison.OrdinalIgnoreCase) ||
-                    answer.Equals("Y", StringComparison.OrdinalIgnoreCase))
-                {
-                    string? vmsPath = FileSelector.SelectFile(
-                        "Paste the full file path of the Microsoft VMS Timesheet Report:",
-                        promptTop
-                    );
-
-                    if (string.IsNullOrWhiteSpace(vmsPath) || !File.Exists(vmsPath))
+                    while (vmsLoading)
                     {
-                        ClearArea(promptTop, 6);
                         Console.SetCursorPosition(0, promptTop);
-                        Console.WriteLine("VMS file not found. Microsoft payment was not processed.");
-                        Console.WriteLine("Press any key to return to the menu...");
-                        Console.ReadKey(true);
+                        Console.Write(
+                            $"Importing Microsoft VMS Report... {frames[i++ % frames.Length]}   ");
 
-                        defaultMenuOption = 1;
-                        continue;
+                        Thread.Sleep(120);
                     }
+                });
 
-                    bool vmsLoading = true;
+                try
+                {
+                    microsoftVmsMatches = MicrosoftVms.Import(microsoftVmsPath);
+                }
+                finally
+                {
+                    vmsLoading = false;
+                    vmsSpinner.Wait();
 
-                    Task vmsSpinner = Task.Run(() =>
-                    {
-                        char[] frames = { '/', '-', '\\', '|' };
-                        int i = 0;
-
-                        while (vmsLoading)
-                        {
-                            Console.SetCursorPosition(0, promptTop);
-                            Console.Write($"Importing VMS Report... {frames[i++ % frames.Length]}   ");
-                            Thread.Sleep(120);
-                        }
-                    });
-
-                    try
-                    {
-                        microsoftVmsMatches = MicrosoftVms.Import(vmsPath);
-                    }
-                    finally
-                    {
-                        vmsLoading = false;
-                        vmsSpinner.Wait();
-
-                        ClearArea(promptTop, 8);
-                    }
+                    ClearArea(promptTop, 8);
                 }
             }
 
@@ -380,7 +353,9 @@ while (true)
                 while (loading)
                 {
                     Console.SetCursorPosition(0, promptTop);
-                    Console.Write($"Processing Microsoft payment file... {frames[i++ % frames.Length]}   ");
+                    Console.Write(
+                        $"Processing Microsoft payment file... {frames[i++ % frames.Length]}   ");
+
                     Thread.Sleep(120);
                 }
             });
