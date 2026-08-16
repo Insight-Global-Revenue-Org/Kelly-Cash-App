@@ -147,13 +147,12 @@ namespace KellyCashApp.Workflows
                 worksheet,
                 originalLastColumn);
 
-            // Auto-size pulled-forward notation columns,
-            // but don't allow them to become excessively wide.
-            AutoFitAddedColumns(
+            // Auto-size notation columns, but never wider than 20.
+            SetAddedColumnWidths(
                 worksheet,
                 headerRow,
                 missingColumns,
-                maxWidth: 30);
+                width: 20);
 
             ApplyFinalUacStyling(
                 worksheet,
@@ -448,27 +447,23 @@ namespace KellyCashApp.Workflows
             return newPayments.OrderBy(x => x).ToList();
         }
 
-        private static void AutoFitAddedColumns(
+        private static void SetAddedColumnWidths(
             IXLWorksheet worksheet,
             int headerRow,
             string[] addedColumns,
-            double maxWidth = 30)
+            double width = 20)
         {
             foreach (string header in addedColumns)
             {
-                int column = FindColumn(worksheet, headerRow, header);
+                int column = FindColumn(
+                    worksheet,
+                    headerRow,
+                    header);
 
                 if (column == -1)
                     continue;
 
-                // First auto-fit based on the contents.
-                worksheet.Column(column).AdjustToContents();
-
-                // Then cap the width if it became too large.
-                if (worksheet.Column(column).Width > maxWidth)
-                {
-                    worksheet.Column(column).Width = maxWidth;
-                }
+                worksheet.Column(column).Width = width;
             }
         }
 
