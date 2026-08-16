@@ -382,18 +382,6 @@ namespace KellyCashApp.Processors.Allegis
                 }
             }
 
-            int totalRow = lastRow + 1;
-
-            var totalCell = worksheet.Cell(totalRow, 6);
-
-            totalCell.FormulaA1 = $"=SUM(F2:F{lastRow})";
-            totalCell.Style.Font.FontName = "Aptos Narrow";
-            totalCell.Style.Font.FontSize = 9;
-            totalCell.Style.Font.Bold = true;
-            totalCell.Style.Fill.BackgroundColor = XLColor.Yellow;
-            totalCell.Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
-            totalCell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
-
             worksheet.Range(1, 1, lastRow, lastColumn).SetAutoFilter();
         }
 
