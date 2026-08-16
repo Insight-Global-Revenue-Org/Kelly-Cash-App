@@ -7,12 +7,12 @@ using System.Text.RegularExpressions;
 
 namespace KellyCashApp.Processors.Allegis
 {
-    internal class MicrosoftPayment
+    internal class CenterpointPayment
     {
         private const int HeaderRow = 6;
         private const int FirstDataRow = 10;
 
-        public static bool IsMicrosoftFormat(IXLWorksheet worksheet)
+        public static bool IsCenterpointFormat(IXLWorksheet worksheet)
         {
             int customerCol = FindColumn(worksheet, HeaderRow, "Customer");
 
@@ -29,8 +29,8 @@ namespace KellyCashApp.Processors.Allegis
                     continue;
 
                 return customer.Equals(
-                    "MICROSOFT - USA",
-                    StringComparison.OrdinalIgnoreCase);
+                    "CENTERPOINT - USA",
+                StringComparison.OrdinalIgnoreCase);
             }
 
             return false;
@@ -41,22 +41,22 @@ namespace KellyCashApp.Processors.Allegis
             IXLWorksheet worksheet,
             string inputPath,
             Dictionary<string, List<OirMatch>> openInvoiceMatches,
-            Dictionary<string, List<MicrosoftVmsMatch>>? vmsMatches = null)
+            Dictionary<string, List<CenterpointVmsMatch>>? vmsMatches = null)
         {
-            int microsoftInvoiceCol = FindColumn(worksheet, HeaderRow, "Consolidated Invoice ID");
+            int centerpointInvoiceCol = FindColumn(worksheet, HeaderRow, "Consolidated Invoice ID");
             int workerCol = FindColumn(worksheet, HeaderRow, "Worker");
             int lineItemEndDateCol = FindColumn(worksheet, HeaderRow, "Invoice Line Item End Date");
             int aggregateAmountCol = FindColumn(worksheet, HeaderRow, "Total Invoice Line Item Amount (Supplier)");
             int taxCol = FindColumn(worksheet, HeaderRow, "Invoice Line Item Total Tax Amount (Supplier)");
 
-            if (microsoftInvoiceCol == -1 || workerCol == -1 || lineItemEndDateCol == -1 || aggregateAmountCol == -1 || taxCol == -1)
-                throw new Exception("Missing one or more required Microsoft remittance columns.");
+            if (centerpointInvoiceCol == -1 || workerCol == -1 || lineItemEndDateCol == -1 || aggregateAmountCol == -1 || taxCol == -1)
+                throw new Exception("Missing one or more required Centerpoint remittance columns.");
 
             var oirRows = BuildOirRows(openInvoiceMatches);
 
             int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? FirstDataRow;
 
-            var outputRows = new List<MicrosoftOutputRow>();
+            var outputRows = new List<CenterpointOutputRow>();
 
             int groupId = 0;
 
@@ -83,10 +83,11 @@ namespace KellyCashApp.Processors.Allegis
                 decimal aggregateAmount = GetDecimalValue(worksheet.Cell(row, aggregateAmountCol));
                 decimal tax = GetDecimalValue(worksheet.Cell(row, taxCol));
                 decimal preTaxAggregateAmount = aggregateAmount - tax;
-                string microsoftInvoice = worksheet.Cell(row, microsoftInvoiceCol).GetString().Trim();
+                string centerpointInvoice =
+                worksheet.Cell(row, centerpointInvoiceCol).GetString().Trim();
 
                 string vmsIdentifier =
-                    new string(microsoftInvoice
+                    new string(centerpointInvoice
                         .Where(char.IsDigit)
                         .ToArray());
 
@@ -95,7 +96,7 @@ namespace KellyCashApp.Processors.Allegis
 
                 string vmsLookupKey = $"{name}|{vmsIdentifier}";
 
-                MicrosoftVmsMatch? vmsMatch = null;
+                CenterpointVmsMatch? vmsMatch = null;
 
                 if (vmsMatches != null &&
                     vmsMatches.TryGetValue(vmsLookupKey, out var foundVmsRows))
@@ -134,7 +135,7 @@ namespace KellyCashApp.Processors.Allegis
                 {
                     foreach (var match in matches)
                     {
-                        outputRows.Add(new MicrosoftOutputRow
+                        outputRows.Add(new CenterpointOutputRow
                         {
                             WeekEndingDate = match.WeekEndingDate.ToString("MM/dd/yyyy"),
                             Name = name,
@@ -148,7 +149,7 @@ namespace KellyCashApp.Processors.Allegis
                                 : "",
                             GroupId = groupId,
                             Concat = $"{name} {formattedLineItemEndDate}",
-                            MicrosoftInvoice = microsoftInvoice,
+                            CenterpointInvoice = centerpointInvoice,
                             VmsIdentifier = vmsIdentifier,
                             AggregateInvoicedNet = vmsMatch?.AggregateInvoicedNet ?? 0,
                             Hours = vmsMatch?.Hours ?? 0,
@@ -160,7 +161,7 @@ namespace KellyCashApp.Processors.Allegis
                 }
                 else
                 {
-                    outputRows.Add(new MicrosoftOutputRow
+                    outputRows.Add(new CenterpointOutputRow
                     {
                         WeekEndingDate = "",
                         Name = name,
@@ -172,7 +173,7 @@ namespace KellyCashApp.Processors.Allegis
                         Notes = "",
                         GroupId = groupId,
                         Concat = $"{name} {formattedLineItemEndDate}",
-                        MicrosoftInvoice = microsoftInvoice,
+                        CenterpointInvoice = centerpointInvoice,
                         VmsIdentifier = vmsIdentifier,
                         AggregateInvoicedNet = vmsMatch?.AggregateInvoicedNet ?? 0,
                         Hours = vmsMatch?.Hours ?? 0,
@@ -209,7 +210,7 @@ namespace KellyCashApp.Processors.Allegis
                 "Tax",
                 "Notes",
                 "Concat",
-                "Microsoft Invoice",
+                "Centerpoint Invoice",
                 "VMS Identifier",
                 "Invoiced Net",
                 "Hours",
@@ -235,7 +236,7 @@ namespace KellyCashApp.Processors.Allegis
                 worksheet.Cell(row, 7).Value = item.Tax;
                 worksheet.Cell(row, 8).Value = item.Notes;
                 worksheet.Cell(row, 9).Value = item.Concat;
-                worksheet.Cell(row, 10).Value = item.MicrosoftInvoice;
+                worksheet.Cell(row, 10).Value = item.CenterpointInvoice;
                 worksheet.Cell(row, 11).Value = item.VmsIdentifier;
                 worksheet.Cell(row, 12).Value = item.AggregateInvoicedNet;
                 worksheet.Cell(row, 13).Value = item.Hours;
@@ -273,15 +274,17 @@ namespace KellyCashApp.Processors.Allegis
 
             string downloadsPath = Settings.GetRemittanceSavePath();
 
-          
+
             string formattedTotal = total.ToString("$#,##0.00;($#,##0.00)", CultureInfo.InvariantCulture);
             string processedDate = DateTime.Now.ToString("M.d.yyyy", CultureInfo.InvariantCulture);
 
-            string outputPath = GetUniqueOutputPath(downloadsPath, $"Microsoft {processedDate} - {formattedTotal}.xlsx");
+            string outputPath = GetUniqueOutputPath(
+                downloadsPath,
+                $"Centerpoint {processedDate} - {formattedTotal}.xlsx");
 
             workbook.SaveAs(outputPath);
 
-            Analytics.LogRemittanceRun($"Microsoft - {formattedTotal}");
+            Analytics.LogRemittanceRun($"Centerpoint - {formattedTotal}");
 
             return outputPath;
         }
@@ -381,18 +384,6 @@ namespace KellyCashApp.Processors.Allegis
                         .Style.Fill.BackgroundColor = XLColor.FromHtml("#F2F2F2");
                 }
             }
-
-            int totalRow = lastRow + 1;
-
-            var totalCell = worksheet.Cell(totalRow, 6);
-
-            totalCell.FormulaA1 = $"=SUM(F2:F{lastRow})";
-            totalCell.Style.Font.FontName = "Aptos Narrow";
-            totalCell.Style.Font.FontSize = 9;
-            totalCell.Style.Font.Bold = true;
-            totalCell.Style.Fill.BackgroundColor = XLColor.Yellow;
-            totalCell.Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
-            totalCell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
 
             worksheet.Range(1, 1, lastRow, lastColumn).SetAutoFilter();
         }
@@ -515,7 +506,16 @@ namespace KellyCashApp.Processors.Allegis
             return path;
         }
 
-        private class MicrosoftOutputRow
+        public class CenterpointVmsMatch
+        {
+            public decimal AggregateInvoicedNet { get; set; }
+            public decimal Hours { get; set; }
+            public decimal RtRate { get; set; }
+            public decimal OtRate { get; set; }
+            public decimal DtRate { get; set; }
+        }
+
+        private class CenterpointOutputRow
         {
             public string WeekEndingDate { get; set; } = "";
             public string Name { get; set; } = "";
@@ -527,7 +527,7 @@ namespace KellyCashApp.Processors.Allegis
             public string InvoiceLineItemEndDate { get; set; } = "";
             public int GroupId { get; set; }
             public string Concat { get; set; } = "";
-            public string MicrosoftInvoice { get; set; } = "";
+            public string CenterpointInvoice { get; set; } = "";
             public string VmsIdentifier { get; set; } = "";
             public decimal AggregateInvoicedNet { get; set; }
             public decimal Hours { get; set; }

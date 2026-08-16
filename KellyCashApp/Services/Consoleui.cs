@@ -42,17 +42,14 @@
         Console.ForegroundColor = ConsoleColor.White;
 
         // Moved this UI (and its helper function) to it's own public class :) If you are reading this, Hello!
-        Console.WriteLine(@"
-█   █ █▀▀▀ █    ▀▀█▀▀ ▄▀▀▄ ▄▀▀▀
-█ ▄ █ █▀▀  █      █   █▀▀█  ▀▀▄
- ▀ ▀  ▀▀▀▀ ▀▀▀▀   ▀   ▀  ▀ ▀▀▀                              
+        Console.WriteLine(@"                            
 ");
 
         Console.ResetColor();
 
         Thread.Sleep(100);
 
-        Console.WriteLine("A Week-Ending Line Total Aggregate Script");
+        Console.WriteLine("A Week-Ending Line Total Aggregator");
         Console.WriteLine("──────────────────────────────────────────────────");
 
         return Console.CursorTop;

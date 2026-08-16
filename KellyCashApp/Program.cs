@@ -295,10 +295,57 @@ while (true)
             worksheet = workbook.Worksheet(1);
         }
 
-        // git-staging setup
+        // Conditional check for Centerpoint payments (Re-routing)
+        if (CenterpointPayment.IsCenterpointFormat(worksheet))
+        {
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            loading = true;
+
+            spinner = Task.Run(() =>
+            {
+                char[] frames = { '/', '-', '\\', '|' };
+                int i = 0;
+
+                while (loading)
+                {
+                    Console.SetCursorPosition(0, promptTop);
+                    Console.Write(
+                        $"Processing Centerpoint payment file... {frames[i++ % frames.Length]}   ");
+
+                    Thread.Sleep(120);
+                }
+            });
+
+            string centerpointOutputPath = CenterpointPayment.Process(
+                workbook,
+                worksheet,
+                inputPath,
+                openInvoiceMatchesMultiple
+            );
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("Centerpoint payment processed successfully.");
+            Console.WriteLine($"Updated file saved to: {centerpointOutputPath}");
+            Console.WriteLine();
+            Console.WriteLine("Press any key to return to the menu...");
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
         // -------- Main Conditional loop for all Allegis Payments! --------
         // Conditional check for Microsoft payments (Re-Routing)
-        // Conditional check for Microsoft payments
         if (MicrosoftPayment.IsMicrosoftFormat(worksheet))
         {
             loading = false;
