@@ -100,23 +100,58 @@ namespace KellyCashApp.Workflows
             int headerRow = FindHeaderRow(worksheet);
 
             if (headerRow == -1)
-                throw new Exception("Could not determine the header row in the NEW Full Cash Report.");
+                throw new Exception(
+                    "Could not determine the header row in the NEW Full Cash Report.");
 
+            // Remove Full Cash columns that are not needed in the working UAC.
+            RemoveUnwantedColumns(worksheet, headerRow);
+
+            // Add calculated Amount Open percentage column.
             AddAmountOpenColumn(worksheet, headerRow);
 
-            int amountOpenColumn = FindColumn(worksheet, headerRow, "Amount Open");
+            int amountOpenColumn = FindColumn(
+            worksheet,
+            headerRow,
+            "Amount Open");
 
             if (amountOpenColumn != -1)
             {
                 worksheet.Column(amountOpenColumn).Width = 12;
             }
 
-            string[] missingColumns = GetMissingOldHeaders(oldUacPath, worksheet, headerRow);
+            // Remember where the original Full Cash Report columns end.
+            // Any notation columns pulled from the old UAC will be added AFTER this.
+            int originalLastColumn =
+                worksheet.LastColumnUsed()?.ColumnNumber() ?? 1;
 
-            AddColumnsToEnd(worksheet, headerRow, missingColumns);
-            newPayments = PullForwardOldUacNotes(worksheet, headerRow, oldUacPath, missingColumns);
+            string[] missingColumns =
+                GetMissingOldHeaders(
+                    oldUacPath,
+                    worksheet,
+                    headerRow);
 
-            ApplyFinalUacStyling(worksheet, headerRow, missingColumns);
+            AddColumnsToEnd(
+            worksheet,
+            headerRow,
+            missingColumns);
+
+            newPayments =
+                PullForwardOldUacNotes(
+                    worksheet,
+                    headerRow,
+                    oldUacPath,
+                    missingColumns);
+
+            // Auto-size only the columns that came from the NEW Full Cash Report.
+            // Pulled-forward notation columns are intentionally left unchanged.
+            AutoFitOriginalColumns(
+                worksheet,
+                originalLastColumn);
+
+            ApplyFinalUacStyling(
+                worksheet,
+                headerRow,
+                missingColumns);
 
             string downloadsPath = Settings.GetFullCashSavePath();
 
@@ -136,6 +171,14 @@ namespace KellyCashApp.Workflows
 
             int oldHeaderRow = FindHeaderRow(oldWorksheet);
 
+            string[] excludedHeaders =
+        {
+            "A/R Rep",
+            "Discount Date",
+            "Due Date",
+            "Customer Name"
+        };
+
             if (oldHeaderRow == -1)
                 throw new Exception("Could not determine the header row in the OLD Full Cash Report.");
 
@@ -145,12 +188,23 @@ namespace KellyCashApp.Workflows
 
             for (int col = 1; col <= oldLastColumn; col++)
             {
-                string oldHeader = oldWorksheet.Cell(oldHeaderRow, col).GetString().Trim();
+                string oldHeader =
+                oldWorksheet.Cell(oldHeaderRow, col)
+                .GetString()
+                .Trim();
 
                 if (string.IsNullOrWhiteSpace(oldHeader))
                     continue;
 
-                int newColumn = FindColumn(newWorksheet, newHeaderRow, oldHeader);
+                if (excludedHeaders.Contains(
+                    oldHeader,
+                    StringComparer.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                int newColumn =
+                    FindColumn(newWorksheet, newHeaderRow, oldHeader);
 
                 if (newColumn == -1 && !missingHeaders.Contains(oldHeader, StringComparer.OrdinalIgnoreCase))
                 {
@@ -247,6 +301,32 @@ namespace KellyCashApp.Workflows
             ClearArea(startLine, 8);
 
             return path;
+        }
+
+        private static void RemoveUnwantedColumns(
+            IXLWorksheet worksheet,
+            int headerRow)
+        {
+            string[] columnsToRemove =
+            {
+        "A/R Rep",
+        "Discount Date",
+        "Due Date",
+        "Customer Name"
+        };
+
+            foreach (string headerName in columnsToRemove)
+            {
+                int column = FindColumn(
+                    worksheet,
+                    headerRow,
+                    headerName);
+
+                if (column != -1)
+                {
+                    worksheet.Column(column).Delete();
+                }
+            }
         }
 
         private static void AddAmountOpenColumn(IXLWorksheet worksheet, int headerRow)
@@ -359,6 +439,16 @@ namespace KellyCashApp.Workflows
             }
 
             return newPayments.OrderBy(x => x).ToList();
+        }
+
+        private static void AutoFitOriginalColumns(
+            IXLWorksheet worksheet,
+            int lastOriginalColumn)
+        {
+            for (int col = 1; col <= lastOriginalColumn; col++)
+            {
+                worksheet.Column(col).AdjustToContents();
+            }
         }
 
         private static string NormalizeDocumentNumber(string value)
