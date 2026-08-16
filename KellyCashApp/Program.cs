@@ -296,6 +296,8 @@ while (true)
         {
             worksheet = workbook.Worksheet(1);
         }
+
+        // git-staging setup
         // -------- Main Conditional loop for all Allegis Payments! --------
         // Conditional check for Microsoft payments (Re-Routing)
         if (MicrosoftPayment.IsMicrosoftFormat(worksheet))
@@ -436,7 +438,7 @@ while (true)
             continue;
         }
 
-        // test 
+        
         // Conditional check for Samsung payments (Re-Routing)
         if (SamsungPayment.IsSamsungFormat(worksheet))
         {
