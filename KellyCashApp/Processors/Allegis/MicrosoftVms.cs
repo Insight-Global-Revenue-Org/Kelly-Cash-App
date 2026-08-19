@@ -39,9 +39,6 @@ namespace KellyCashApp.Processors.Allegis
                 if (vmsIdentifier.Length > 5)
                     vmsIdentifier = vmsIdentifier[^5..];
 
-                if (string.IsNullOrWhiteSpace(workerName) || string.IsNullOrWhiteSpace(vmsIdentifier))
-                    continue;
-
                 string key = $"{workerName}|{vmsIdentifier}";
 
                 decimal invoicedNet = GetDecimalValue(worksheet.Cell(row, invoicedNetCol));

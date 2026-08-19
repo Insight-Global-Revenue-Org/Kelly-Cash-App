@@ -53,11 +53,12 @@ namespace KellyCashApp.Processors.Kelly_Services
                 }
 
                 string workerName =
-                    ExtractWorkerName(feeDescription);
+                ExtractWorkerName(feeDescription);
 
-                if (string.IsNullOrWhiteSpace(workerName))
-                    continue;
-
+                // IMPORTANT:
+                // Even if we could not parse a contractor name,
+                // still keep the VMS record so Fee Description
+                // can be written to Notes.
                 matches[invoiceId] =
                     new JohnsonJohnsonVmsMatch(
                         InvoiceId: invoiceId,

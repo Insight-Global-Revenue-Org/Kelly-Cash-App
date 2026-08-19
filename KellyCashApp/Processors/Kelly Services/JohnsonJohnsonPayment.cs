@@ -104,8 +104,6 @@ namespace KellyCashApp.Processors.Kelly_Services
                 worksheet.LastRowUsed()?.RowNumber()
                 ?? FirstDataRow;
 
-            int groupId = 0;
-
             // Reuse your existing contractor name-change system.
             var nameChanges = Rename.LoadNameChanges();
 
@@ -180,8 +178,6 @@ if (vmsMatches != null &&
         nameChanges);
 }
 
-                groupId++;
-
                 string concat =
                     string.IsNullOrWhiteSpace(name)
                         ? ""
@@ -208,98 +204,93 @@ if (vmsMatches != null &&
                             .ToList();
 
                 // -----------------------------------------------------
-                // First try matching the full LineTotal.
+                // Find ONE OIR invoice.
+                //
+                // Select whichever Amount Due is closest to LineTotal,
+                // but only accept it if the difference is within 5%.
+                //
+                // WeekEndingDate does not affect matching.
                 // -----------------------------------------------------
 
-                var matches =
-                    FindBestInvoiceCombination(
+                OirLookupRow? bestMatch =
+                    FindClosestInvoiceMatch(
                         possibleMatches,
                         aggregateAmountPaid);
 
-                // -----------------------------------------------------
-                // If OIR invoice(s) were found, create one output row
-                // per matched OIR invoice.
-                //
-                // This allows one J&J payment row to match multiple
-                // OIR invoices, similar to Microsoft.
-                // -----------------------------------------------------
-
-                if (matches.Any())
+                if (bestMatch != null)
                 {
-                    foreach (var match in matches)
-                    {
-                        outputRows.Add(
-                            new JohnsonJohnsonOutputRow
-                            {
-                                WeekEndingDate =
-                                    formattedWeekEndingDate,
-
-                                Name = name,
-
-                                Invoice =
-                                    match.Invoice,
-
-                                AmountDue =
-                                    match.AmountDue,
-
-                                AggregateAmountPaid =
-                                    aggregateAmountPaid,
-
-                                Tax = tax,
-
-                                Notes = feeDescription,
-
-                                Item = item,
-
-                                Concat = concat,
-
-                                InvoiceNumber =
-                                    invoiceId,
-
-                                GroupId = groupId
-                            });
-                    }
-                }
-                else
-                {
-                    // -------------------------------------------------
-                    // Still output the payment row if no OIR match
-                    // exists.
-                    //
-                    // This makes unmatched items visible rather than
-                    // silently dropping them.
-                    // -------------------------------------------------
-
                     outputRows.Add(
                         new JohnsonJohnsonOutputRow
                         {
                             WeekEndingDate =
                                 formattedWeekEndingDate,
 
-                            Name = name,
+                            Name =
+                                name,
 
-                            Invoice = "",
+                            Invoice =
+                                bestMatch.Invoice,
 
-                            AmountDue = 0,
+                            AmountDue =
+                                bestMatch.AmountDue,
 
                             AggregateAmountPaid =
                                 aggregateAmountPaid,
 
-                            Tax = tax,
+                            Tax =
+                                tax,
 
+                            // Always preserve the complete VMS Fee Description.
                             Notes =
-                    !string.IsNullOrWhiteSpace(feeDescription)
-                        ? feeDescription
-                        : "No J&J VMS match found.",
+                                feeDescription,
 
-                            Item = item,
+                            Item =
+                                item,
 
-                            Concat = concat,
+                            Concat =
+                                concat,
 
                             InvoiceNumber =
-                                invoiceId,
+                                invoiceId
+                        });
+                }
+                else
+                {
+                    outputRows.Add(
+                        new JohnsonJohnsonOutputRow
+                        {
+                            WeekEndingDate =
+                                formattedWeekEndingDate,
 
-                            GroupId = groupId
+                            Name =
+                                name,
+
+                            Invoice =
+                                "",
+
+                            AmountDue =
+                                0,
+
+                            AggregateAmountPaid =
+                                aggregateAmountPaid,
+
+                            Tax =
+                                tax,
+
+                            // If the VMS lookup succeeded, always retain
+                            // whatever Fee Description was present —
+                            // even if no contractor name could be parsed.
+                            Notes =
+                                feeDescription,
+
+                            Item =
+                                item,
+
+                            Concat =
+                                concat,
+
+                            InvoiceNumber =
+                                invoiceId
                         });
                 }
             }
@@ -311,17 +302,6 @@ if (vmsMatches != null &&
             decimal total =
                 outputRows.Sum(
                     x => x.AggregateAmountPaid);
-
-            // If one payment matched multiple OIR invoices,
-            // AggregateAmountPaid is repeated in outputRows.
-            //
-            // Therefore recalculate total by payment GroupId instead
-            // of blindly summing every output row.
-            total =
-                outputRows
-                    .GroupBy(x => x.GroupId)
-                    .Sum(g =>
-                        g.First().AggregateAmountPaid);
 
             // Remove pictures/shapes before rebuilding the worksheet.
             foreach (var picture in worksheet.Pictures.ToList())
@@ -404,99 +384,6 @@ if (vmsMatches != null &&
                     item.InvoiceNumber;
             }
 
-            // ---------------------------------------------------------
-            // If one J&J payment row matched multiple OIR invoices,
-            // merge the payment-level information vertically.
-            //
-            // Invoice + Amount Due stay separate because those belong
-            // to individual OIR invoices.
-            // ---------------------------------------------------------
-
-            foreach (var group in
-                     outputRows.GroupBy(x => x.GroupId))
-            {
-                int firstOutputRow =
-                    outputRows.IndexOf(group.First()) + 2;
-
-                int lastOutputRow =
-                    outputRows.IndexOf(group.Last()) + 2;
-
-                if (lastOutputRow > firstOutputRow)
-                {
-                    // Week Ending Date
-                    worksheet.Range(
-                        firstOutputRow,
-                        1,
-                        lastOutputRow,
-                        1)
-                        .Merge();
-
-                    // Name
-                    worksheet.Range(
-                        firstOutputRow,
-                        2,
-                        lastOutputRow,
-                        2)
-                        .Merge();
-
-                    // Aggregate Amount Paid
-                    worksheet.Range(
-                        firstOutputRow,
-                        5,
-                        lastOutputRow,
-                        5)
-                        .Merge();
-
-                    // Tax
-                    worksheet.Range(
-                        firstOutputRow,
-                        6,
-                        lastOutputRow,
-                        6)
-                        .Merge();
-
-                    // Notes
-                    worksheet.Range(
-                        firstOutputRow,
-                        7,
-                        lastOutputRow,
-                        7)
-                        .Merge();
-
-                    // Item
-                    worksheet.Range(
-                        firstOutputRow,
-                        8,
-                        lastOutputRow,
-                        8)
-                        .Merge();
-
-                    // Concat
-                    worksheet.Range(
-                        firstOutputRow,
-                        9,
-                        lastOutputRow,
-                        9)
-                        .Merge();
-
-                    // Invoice Number / InvoiceID
-                    worksheet.Range(
-                        firstOutputRow,
-                        10,
-                        lastOutputRow,
-                        10)
-                        .Merge();
-                }
-
-                worksheet.Range(
-                    firstOutputRow,
-                    1,
-                    lastOutputRow,
-                    10)
-                    .Style.Alignment.Vertical =
-                    XLAlignmentVerticalValues.Center;
-            }
-
             ApplyFormatting(
                 worksheet,
                 outputRows.Count + 1,
@@ -537,25 +424,27 @@ if (vmsMatches != null &&
         // =============================================================
 
         private static List<OirLookupRow> BuildOirRows(
-            Dictionary<string, List<OirMatch>>
-                openInvoiceMatches)
+            Dictionary<string, List<OirMatch>> openInvoiceMatches)
         {
-            var rows =
-                new List<OirLookupRow>();
+            var rows = new List<OirLookupRow>();
 
             foreach (var item in openInvoiceMatches)
             {
                 // OIR dictionary keys look like:
-                //
                 // John Smith 08/15/2026
                 //
-                // Pull the contractor name and date back apart.
+                // Separate the contractor name from the date.
                 Match match = Regex.Match(
                     item.Key,
                     @"^(?<name>.+)\s(?<date>\d{1,2}/\d{1,2}/\d{2,4})$");
 
                 if (!match.Success)
                     continue;
+
+                string name =
+                    match.Groups["name"]
+                        .Value
+                        .Trim();
 
                 if (!DateTime.TryParse(
                     match.Groups["date"].Value,
@@ -564,29 +453,16 @@ if (vmsMatches != null &&
                     continue;
                 }
 
-                string name =
-                    match.Groups["name"]
-                        .Value
-                        .Trim();
-
                 foreach (var oirMatch in item.Value)
                 {
                     rows.Add(
                         new OirLookupRow
                         {
                             Name = name,
-
-                            WeekEndingDate =
-                                weekEnding,
-
-                            Invoice =
-                                oirMatch.DocumentNumber,
-
-                            AmountDue =
-                                oirMatch.RemainingAmount,
-
-                            Concat =
-                                item.Key
+                            WeekEndingDate = weekEnding,
+                            Invoice = oirMatch.DocumentNumber,
+                            AmountDue = oirMatch.RemainingAmount,
+                            Concat = item.Key
                         });
                 }
             }
@@ -595,111 +471,46 @@ if (vmsMatches != null &&
         }
 
         // =============================================================
-        // INVOICE COMBINATION MATCHING
+        // SINGLE INVOICE AMOUNT MATCHING
         // =============================================================
 
-        private static List<OirLookupRow>
-            FindBestInvoiceCombination(
-                List<OirLookupRow> possibleMatches,
-                decimal targetAmount)
+        private static OirLookupRow? FindClosestInvoiceMatch(
+            List<OirLookupRow> possibleMatches,
+            decimal targetAmount)
         {
-            // Exact match tolerance = 10 cents.
-            const decimal exactTolerance = 0.10m;
+            const decimal allowedPercentDifference = 0.05m;
 
-            // Similar to your Microsoft workflow.
-            // Allows differences of up to 2% if no exact combination
-            // exists.
-            const decimal allowedPercentDifference = 0.02m;
+            if (possibleMatches.Count == 0)
+                return null;
 
-            decimal amountTolerance =
-                    Math.Abs(
-                        targetAmount *
-                        allowedPercentDifference);
+            if (targetAmount == 0)
+                return null;
 
-            List<OirLookupRow> bestMatch =
-                new();
+            // Find the ONE OIR invoice whose Amount Due
+            // is closest to the J&J LineTotal.
+            OirLookupRow? bestMatch =
+                possibleMatches
+                    .OrderBy(x =>
+                        Math.Abs(
+                            x.AmountDue - targetAmount))
+                    .FirstOrDefault();
 
-            decimal bestDifference =
-                decimal.MaxValue;
+            if (bestMatch == null)
+                return null;
 
-            int count =
-                possibleMatches.Count;
+            decimal difference =
+                Math.Abs(
+                    bestMatch.AmountDue -
+                    targetAmount);
 
-            if (count == 0)
-                return bestMatch;
+            decimal allowedDifference =
+                Math.Abs(
+                    targetAmount *
+                    allowedPercentDifference);
 
-            /*
-                The bit-mask combination approach becomes extremely
-                expensive with very large candidate sets.
-
-                A contractor/week-ending combination should normally
-                have only a small number of OIR invoices, but limiting
-                to 20 also protects the application from accidentally
-                attempting millions/billions of combinations.
-            */
-            if (count > 20)
-            {
-                possibleMatches =
-                    possibleMatches
-                        .OrderBy(x =>
-                            Math.Abs(
-                                x.AmountDue -
-                                targetAmount))
-                        .Take(20)
-                        .ToList();
-
-                count =
-                    possibleMatches.Count;
-            }
-
-            int combinationCount =
-                1 << count;
-
-            for (int mask = 1;
-                 mask < combinationCount;
-                 mask++)
-            {
-                var currentGroup =
-                    new List<OirLookupRow>();
-
-                for (int i = 0;
-                     i < count;
-                     i++)
-                {
-                    if ((mask & (1 << i)) != 0)
-                    {
-                        currentGroup.Add(
-                            possibleMatches[i]);
-                    }
-                }
-
-                decimal groupTotal =
-                    currentGroup.Sum(
-                        x => x.AmountDue);
-
-                decimal difference =
-                    Math.Abs(
-                        groupTotal -
-                        targetAmount);
-
-                // Exact match wins immediately.
-                if (difference <= exactTolerance)
-                {
-                    return currentGroup;
-                }
-
-                // Otherwise remember the best match
-                // within 2%.
-                if (difference <= amountTolerance &&
-                    difference < bestDifference)
-                {
-                    bestDifference =
-                        difference;
-
-                    bestMatch =
-                        currentGroup;
-                }
-            }
+            // Closest invoice still has to fall inside 5%.
+            if (difference > allowedDifference)
+                return null;
 
             return bestMatch;
         }
@@ -866,8 +677,8 @@ if (vmsMatches != null &&
             // ---------------------------------------------------------
 
             for (int row = 2;
-                 row <= lastRow;
-                 row++)
+      row <= lastRow;
+      row++)
             {
                 string name =
                     worksheet.Cell(row, 2)
@@ -879,13 +690,56 @@ if (vmsMatches != null &&
                         .GetString()
                         .Trim();
 
+                string item =
+                    worksheet.Cell(row, 8)
+                        .GetString()
+                        .Trim();
+
                 decimal amountDue =
                     GetDecimalValue(
                         worksheet.Cell(row, 4));
 
-                // Gray unmatched rows.
-                if (string.IsNullOrWhiteSpace(name) ||
-                    string.IsNullOrWhiteSpace(invoice))
+                // ---------------------------------------------------------
+                // RULE 1:
+                // Anything in Item other than exactly "Fees"
+                // gets the very light blue fill.
+                // ---------------------------------------------------------
+
+                if (!item.Equals(
+                    "Fees",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    worksheet.Cell(row, 8)
+                        .Style.Fill.BackgroundColor =
+                        XLColor.FromHtml("#DDEBF7");
+                }
+
+                // ---------------------------------------------------------
+                // RULE 2:
+                // If no contractor name could be parsed from the VMS
+                // Fee Description, highlight the entire row very light red.
+                //
+                // Red takes priority over blue.
+                // ---------------------------------------------------------
+
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    worksheet.Range(
+                        row,
+                        1,
+                        row,
+                        lastColumn)
+                        .Style.Fill.BackgroundColor =
+                        XLColor.FromHtml("#FCE4D6");
+                }
+
+                // ---------------------------------------------------------
+                // RULE 3:
+                // Contractor exists, but no OIR invoice was within 5%.
+                // Keep your gray unmatched-row behavior.
+                // ---------------------------------------------------------
+
+                else if (string.IsNullOrWhiteSpace(invoice))
                 {
                     worksheet.Range(
                         row,
@@ -894,8 +748,20 @@ if (vmsMatches != null &&
                         lastColumn)
                         .Style.Fill.BackgroundColor =
                         XLColor.FromHtml("#F2F2F2");
+
+                    // Reapply the blue Item color because the gray row
+                    // fill above overwrote it.
+                    if (!item.Equals(
+                        "Fees",
+                        StringComparison.OrdinalIgnoreCase))
+                    {
+                        worksheet.Cell(row, 8)
+                            .Style.Fill.BackgroundColor =
+                            XLColor.FromHtml("#DDEBF7");
+                    }
                 }
 
+                // Amount Due of zero stays red text.
                 if (amountDue <= 0)
                 {
                     worksheet.Cell(row, 4)
@@ -916,13 +782,6 @@ if (vmsMatches != null &&
                     totalRow,
                     5);
 
-            /*
-                Some payment values may be merged because one payment
-                matched multiple invoices.
-
-                SUM still treats a merged region as the value in its
-                first cell, so this remains safe.
-            */
             totalCell.FormulaA1 =
                 $"=SUM(E2:E{lastRow})";
 
@@ -1013,8 +872,6 @@ if (vmsMatches != null &&
             public string Concat { get; set; } = "";
 
             public string InvoiceNumber { get; set; } = "";
-
-            public int GroupId { get; set; }
         }
 
         private class OirLookupRow
