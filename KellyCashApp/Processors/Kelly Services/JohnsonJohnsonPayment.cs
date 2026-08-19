@@ -478,7 +478,7 @@ if (vmsMatches != null &&
             List<OirLookupRow> possibleMatches,
             decimal targetAmount)
         {
-            const decimal allowedPercentDifference = 0.05m;
+            const decimal allowedPercentDifference = 0.02m;
 
             if (possibleMatches.Count == 0)
                 return null;
