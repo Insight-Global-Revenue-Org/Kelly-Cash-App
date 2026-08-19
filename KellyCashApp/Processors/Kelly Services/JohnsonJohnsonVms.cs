@@ -167,36 +167,93 @@ namespace KellyCashApp.Processors.Kelly_Services
                 @"Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec";
 
             string[] patterns =
-            {
-        // Emma Williams Bonus Dec. 2025
-        // Capture the name BEFORE the word "Bonus".
-        $@"^(?<name>.+?)\s+Bonus\s+(?:{months})\.?\s+\d{{4}}\b",
+{
+    // ---------------------------------------------------------
+    // BONUS
+    //
+    // Emma Williams Bonus Dec. 2025
+    // Medhat Kamel Bonus
+    // ---------------------------------------------------------
 
-        // Brett Norton December 2025
-        // Hany Selim December 2025 180/184 Hours
-        $@"^(?<name>.+?)\s+(?:{months})\.?\s+\d{{4}}\b",
+    $@"^(?<name>.+?)\s+Bonus(?:\s+(?:{months})\.?\s+\d{{4}})?\b",
 
-        // Stacey Davis WE 10/4/26
-        // Stacey Davis WE 12.13.25
-        @"^(?<name>.+?)\s+WE\s+\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b",
+    // ---------------------------------------------------------
+    // WORKED HOURS
+    //
+    // Adam Vanderwalker worked 40 hours WE 3/23
+    // Isabel Henao Worked 40 Hours W.E. 2.28.26
+    // ---------------------------------------------------------
 
-        // Stacey Davis 10.11.26
-        // Stacey Davis 11.15.25
-        @"^(?<name>.+?)\s+\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b",
+    @"^(?<name>.+?)\s+worked\s+\d+(?:\.\d+)?\s+hours?\b",
 
-        // Adam Vanderwalker worked 40 hours WE 3/23
-        @"^(?<name>.+?)\s+worked\s+\d+(?:\.\d+)?\s+hours?\b",
+    // ---------------------------------------------------------
+    // OT / ST / STRAIGHT TIME
+    //
+    // John Wadkins 4 OT hours July 2023
+    // Brittany Winters 90 Hours OT January 2026
+    // Jeremy Verwey 167.49/184 ST Hours
+    // ---------------------------------------------------------
 
-        // Ronald Eglentowicz 154.5 hours July 2023
-        @"^(?<name>.+?)\s+\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?\s+hours?\b",
+    @"^(?<name>.+?)\s+\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?\s+(?:OT|ST|Straight\s+Time)\s+hours?\b",
 
-        // John Wadkins 4 OT hours July 2023
-        // John Wadkins 155 ST hours July 2023
-        @"^(?<name>.+?)\s+\d+(?:\.\d+)?\s+(?:OT|ST|Straight\s+Time)\s+hours?\b",
+    // Some rows put OT/ST AFTER "Hours":
+    // Brittany Winters 35.33 Hours Ot October 2025
+    @"^(?<name>.+?)\s+\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?\s+hours?\s+(?:OT|ST)\b",
 
-        // Sean Peterson Expense
-        @"^(?<name>.+?)\s+Expense\b"
-    };
+    // ---------------------------------------------------------
+    // NORMAL HOURS
+    //
+    // Chloe Oxley 176 Hours December 2025
+    // Shannell Banks 340 Hours January 2026
+    // Laura Clagett 168 Hours December 2025
+    // Hany Selim 180/184 Hours
+    // ---------------------------------------------------------
+
+    @"^(?<name>.+?)\s+\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?\s+hours?\b",
+
+    // ---------------------------------------------------------
+    // EXPENSE / EXPENSES
+    //
+    // Sean Peterson Expense
+    // ---------------------------------------------------------
+
+    @"^(?<name>.+?)\s+Expenses?\b",
+
+    // Month before "Expense(s)"
+    // Kevin Tseng Jan Expenses 1/18/2026 - 1/24/2026
+    $@"^(?<name>.+?)\s+(?:{months})\.?\s+Expenses?\b",
+
+    // ---------------------------------------------------------
+    // MONTH + YEAR
+    //
+    // Brett Norton December 2025
+    // Tejas Pawar November 2025
+    // Zainab Khan January 2026 176 Hours
+    //
+    // IMPORTANT: This comes AFTER the hours patterns.
+    // ---------------------------------------------------------
+
+    $@"^(?<name>.+?)\s+(?:{months})\.?\s+\d{{4}}\b",
+
+    // ---------------------------------------------------------
+    // WE / W.E. + DATE
+    //
+    // Stacey Davis WE 10/4/26
+    // Stacey Davis W.E. 12.13.25
+    // ---------------------------------------------------------
+
+    @"^(?<name>.+?)\s+(?:WE|W\.E\.)\s+\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b",
+
+    // ---------------------------------------------------------
+    // PLAIN DATE
+    //
+    // Stacey Davis 10.11.26
+    //
+    // Keep this LAST because it's the broadest rule.
+    // ---------------------------------------------------------
+
+    @"^(?<name>.+?)\s+\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b"
+};
 
             foreach (string pattern in patterns)
             {
