@@ -563,6 +563,208 @@ while (true)
             continue;
         }
 
+        // Conditional check for Monument payments (Re-Routing)
+        if (MonumentPayment.IsMonumentFormat(worksheet))
+        {
+            string monumentOutputPath =
+                MonumentPayment.Process(
+                    workbook,
+                    worksheet,
+                    inputPath,
+                    openInvoiceMatches);
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine(
+                "Monument payment processed successfully.");
+
+            Console.WriteLine(
+                $"Updated file saved to: {monumentOutputPath}");
+
+            Console.WriteLine();
+
+            Console.WriteLine(
+                "Press any key to return to the menu...");
+
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
+
+        // ================================================================
+        // JOHNSON & JOHNSON PAYMENT
+        // ================================================================
+
+        if (JohnsonJohnsonPayment.IsJohnsonJohnsonFormat(worksheet))
+        {
+            // Stop the generic "Processing payment file..." spinner
+            // while we load the J&J VMS report.
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Dictionary<string, JohnsonJohnsonVmsMatch>?
+                johnsonJohnsonVmsMatches = null;
+
+            string johnsonJohnsonVmsPath =
+                Settings.GetJohnsonJohnsonVmsReportFilePath();
+
+            // ------------------------------------------------------------
+            // Import the configured J&J VMS report.
+            // ------------------------------------------------------------
+
+            if (!string.IsNullOrWhiteSpace(
+                johnsonJohnsonVmsPath))
+            {
+                bool vmsLoading = true;
+
+                Task vmsSpinner = Task.Run(() =>
+                {
+                    char[] frames =
+                    {
+                '/',
+                '-',
+                '\\',
+                '|'
+            };
+
+                    int i = 0;
+
+                    while (vmsLoading)
+                    {
+                        Console.SetCursorPosition(
+                            0,
+                            promptTop);
+
+                        Console.Write(
+                            $"Importing Johnson & Johnson VMS Report... " +
+                            $"{frames[i++ % frames.Length]}   ");
+
+                        Thread.Sleep(120);
+                    }
+                });
+
+                try
+                {
+                    johnsonJohnsonVmsMatches =
+                        JohnsonJohnsonVms.Import(
+                            johnsonJohnsonVmsPath);
+                }
+                finally
+                {
+                    vmsLoading = false;
+
+                    vmsSpinner.Wait();
+
+                    ClearArea(
+                        promptTop,
+                        8);
+                }
+            }
+
+            // ------------------------------------------------------------
+            // Start a new spinner for the actual payment processor.
+            // ------------------------------------------------------------
+
+            loading = true;
+
+            spinner = Task.Run(() =>
+            {
+                char[] frames =
+                {
+            '/',
+            '-',
+            '\\',
+            '|'
+        };
+
+                int i = 0;
+
+                while (loading)
+                {
+                    Console.SetCursorPosition(
+                        0,
+                        promptTop);
+
+                    Console.Write(
+                        $"Processing Johnson & Johnson payment file... " +
+                        $"{frames[i++ % frames.Length]}   ");
+
+                    Thread.Sleep(120);
+                }
+            });
+
+            // ------------------------------------------------------------
+            // Process the payment.
+            //
+            // openInvoiceMatchesMultiple is important because J&J,
+            // like Microsoft, can potentially match more than one OIR
+            // invoice to a payment.
+            // ------------------------------------------------------------
+
+            string johnsonJohnsonOutputPath =
+                JohnsonJohnsonPayment.Process(
+                    workbook,
+                    worksheet,
+                    inputPath,
+                    openInvoiceMatchesMultiple,
+                    johnsonJohnsonVmsMatches);
+
+            loading = false;
+
+            spinner.Wait();
+
+            ClearArea(
+                promptTop,
+                8);
+
+            Console.SetCursorPosition(
+                0,
+                promptTop);
+
+            if (johnsonJohnsonVmsMatches == null)
+            {
+                Console.ForegroundColor =
+                    ConsoleColor.Yellow;
+
+                Console.WriteLine(
+                    "Johnson & Johnson payment processed, " +
+                    "but no J&J VMS report was configured.");
+
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.WriteLine(
+                    "Johnson & Johnson payment processed " +
+                    "successfully with VMS report.");
+            }
+
+            Console.WriteLine(
+                $"Updated file saved to: " +
+                $"{johnsonJohnsonOutputPath}");
+
+            Console.WriteLine();
+
+            Console.WriteLine(
+                "Press any key to return to the menu...");
+
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+
+            continue;
+        }
+
+
         // No specialized format matched.
         // Process using standard Kelly logic.
         string kellyOutputPath = KellyPayment.Process(

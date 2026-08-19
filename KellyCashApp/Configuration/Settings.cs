@@ -22,7 +22,8 @@
 
         private static string MicrosoftVmsReportFilePathFile =>
             Path.Combine(SettingsFolder, "microsoft-vms-report-file-path.txt");
-
+        private static string JohnsonJohnsonVmsReportFilePathFile =>
+            Path.Combine(SettingsFolder, "johnson-johnson-vms-report-file-path.txt");
         private static string NikeTrackerBoardFilePathFile =>
             Path.Combine(SettingsFolder, "nike-tracker-board-file-path.txt");
 
@@ -154,6 +155,20 @@
             return "";
         }
 
+        public static string GetJohnsonJohnsonVmsReportFilePath()
+        {
+            if (File.Exists(JohnsonJohnsonVmsReportFilePathFile))
+            {
+                string savedPath =
+                    File.ReadAllText(JohnsonJohnsonVmsReportFilePathFile).Trim();
+
+                if (File.Exists(savedPath))
+                    return savedPath;
+            }
+
+            return "";
+        }
+
         public static string GetNikeTrackerBoardFilePath()
         {
             if (File.Exists(NikeTrackerBoardFilePathFile))
@@ -174,13 +189,14 @@
                 ConsoleUi.ResetPage(menuTop);
 
                 int selected = ShowMenu(new[]
-                {
-            "Microsoft VMS Report File Path",
-            "Nike Tracker Board File Path",
-            "Back"
-        }, 0, menuTop);
+            {
+                "Microsoft VMS Report File Path",
+                "Johnson & Johnson VMS Report File Path",
+                "Nike Tracker Board File Path",
+                "Back"
+            }, 0, menuTop);
 
-                if (selected == 2)
+                if (selected == 3)
                     return;
 
                 ConsoleUi.ResetPage(menuTop);
@@ -195,6 +211,15 @@
                 }
 
                 if (selected == 1)
+                {
+                    SaveFilePathSetting(
+                        "Paste the full Excel file path for the Johnson & Johnson VMS Report:",
+                        JohnsonJohnsonVmsReportFilePathFile,
+                        menuTop
+                    );
+                }
+
+                if (selected == 2)
                 {
                     SaveFilePathSetting(
                         "Paste the full Excel file path for the Nike Tracker Board:",
@@ -276,6 +301,14 @@
 
             Console.WriteLine("Microsoft VMS Report File Path:");
             Console.WriteLine(string.IsNullOrWhiteSpace(GetMicrosoftVmsReportFilePath()) ? "Not set yet" : GetMicrosoftVmsReportFilePath());
+            Console.WriteLine();
+
+            Console.WriteLine("Johnson & Johnson VMS Report File Path:");
+            Console.WriteLine(
+                string.IsNullOrWhiteSpace(GetJohnsonJohnsonVmsReportFilePath())
+                    ? "Not set yet"
+                    : GetJohnsonJohnsonVmsReportFilePath()
+            );
             Console.WriteLine();
 
             Console.WriteLine("Nike Tracker Board File Path:");
