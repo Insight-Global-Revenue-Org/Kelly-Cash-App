@@ -161,9 +161,31 @@ namespace KellyCashApp.Processors.Kelly_Services
             string pattern =
                 $@"^(?<name>.+?)" +
                 $@"(?=" +
+
+                    // Example:
+                    // Ronald Eglentowicz 154.5 hours July 2023
+                    // John Wadkins 4 OT hours July 2023
                     $@"\s+(?:worked\s+)?\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?\s+(?:OT\s+|ST\s+|Straight\s+Time\s+)?hours?\b" +
+
+                    // Example:
+                    // Sean Peterson Expense
                     $@"|\s+Expense\b" +
+
+                    // Example:
+                    // Hany Selim December 2025 180/184 Hours
+                    // Mital Patel January 2026 176 Hours
                     $@"|\s+(?:{months})\b" +
+
+                    // Example:
+                    // Stacey Davis WE 10/4/26
+                    // Stacey Davis WE 12.13.25
+                    $@"|\s+WE\s+\d{{1,2}}[./-]\d{{1,2}}[./-]\d{{2,4}}\b" +
+
+                    // Example:
+                    // Stacey Davis 10.11.26
+                    // Stacey Davis 11.15.25
+                    $@"|\s+\d{{1,2}}[./-]\d{{1,2}}[./-]\d{{2,4}}\b" +
+
                 $@")";
 
             Match match = Regex.Match(
