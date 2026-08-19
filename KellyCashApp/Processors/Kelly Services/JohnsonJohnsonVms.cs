@@ -133,7 +133,7 @@ namespace KellyCashApp.Processors.Kelly_Services
         }
 
         private static string ExtractWorkerName(
-            string feeDescription)
+    string feeDescription)
         {
             if (string.IsNullOrWhiteSpace(feeDescription))
                 return "";
@@ -144,61 +144,80 @@ namespace KellyCashApp.Processors.Kelly_Services
                 " ");
 
             /*
-                Examples this is designed for:
+                Supported examples:
+
+                Brett Norton December 2025
+                Emma Williams Bonus Dec. 2025
+                Hany Selim December 2025 180/184 Hours
+                Mital Patel January 2026 176 Hours
+
+                Stacey Davis WE 10/4/26
+                Stacey Davis WE 12.13.25
+                Stacey Davis 10.11.26
 
                 Ronald Eglentowicz 154.5 hours July 2023
                 John Wadkins 4 OT hours July 2023
-                Sean Peterson Expense
                 Adam Vanderwalker worked 40 hours WE 3/23
-                Jennifer Lithgow August 6th - Sept 5th 2023
+                Sean Peterson Expense
             */
 
             string months =
                 @"January|February|March|April|May|June|" +
-                @"July|August|September|Sept|October|November|December|" +
-                @"Jan|Feb|Mar|Apr|Jun|Jul|Aug|Oct|Nov|Dec";
+                @"July|August|September|October|November|December|" +
+                @"Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec";
 
-            string pattern =
-                $@"^(?<name>.+?)" +
-                $@"(?=" +
+            string[] patterns =
+            {
+        // Emma Williams Bonus Dec. 2025
+        // Capture the name BEFORE the word "Bonus".
+        $@"^(?<name>.+?)\s+Bonus\s+(?:{months})\.?\s+\d{{4}}\b",
 
-                    // Examples:
-                    // Ronald Eglentowicz 154.5 hours July 2023
-                    // John Wadkins 4 OT hours July 2023
-                    $@"\s+(?:worked\s+)?\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?\s+(?:OT\s+|ST\s+|Straight\s+Time\s+)?hours?\b" +
+        // Brett Norton December 2025
+        // Hany Selim December 2025 180/184 Hours
+        $@"^(?<name>.+?)\s+(?:{months})\.?\s+\d{{4}}\b",
 
-                    // Example:
-                    // Sean Peterson Expense
-                    $@"|\s+Expense\b" +
+        // Stacey Davis WE 10/4/26
+        // Stacey Davis WE 12.13.25
+        @"^(?<name>.+?)\s+WE\s+\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b",
 
-                    // Examples:
-                    // Brett Norton December 2025
-                    // Hany Selim December 2025 180/184 Hours
-                    // Mital Patel January 2026 176 Hours
-                    $@"|\s+(?:{months})\s+\d{{4}}\b" +
+        // Stacey Davis 10.11.26
+        // Stacey Davis 11.15.25
+        @"^(?<name>.+?)\s+\d{1,2}[./-]\d{1,2}[./-]\d{2,4}\b",
 
-                    // Examples:
-                    // Stacey Davis WE 10/4/26
-                    // Stacey Davis WE 12.13.25
-                    $@"|\s+WE\s+\d{{1,2}}[./-]\d{{1,2}}[./-]\d{{2,4}}\b" +
+        // Adam Vanderwalker worked 40 hours WE 3/23
+        @"^(?<name>.+?)\s+worked\s+\d+(?:\.\d+)?\s+hours?\b",
 
-                    // Examples:
-                    // Stacey Davis 10.11.26
-                    // Stacey Davis 11.15.25
-                    $@"|\s+\d{{1,2}}[./-]\d{{1,2}}[./-]\d{{2,4}}\b" +
+        // Ronald Eglentowicz 154.5 hours July 2023
+        @"^(?<name>.+?)\s+\d+(?:\.\d+)?(?:\s*/\s*\d+(?:\.\d+)?)?\s+hours?\b",
 
-                $@")";
+        // John Wadkins 4 OT hours July 2023
+        // John Wadkins 155 ST hours July 2023
+        @"^(?<name>.+?)\s+\d+(?:\.\d+)?\s+(?:OT|ST|Straight\s+Time)\s+hours?\b",
 
-            Match match = Regex.Match(
-                value,
-                pattern,
-                RegexOptions.IgnoreCase);
+        // Sean Peterson Expense
+        @"^(?<name>.+?)\s+Expense\b"
+    };
 
-            if (!match.Success)
-                return "";
+            foreach (string pattern in patterns)
+            {
+                Match match = Regex.Match(
+                    value,
+                    pattern,
+                    RegexOptions.IgnoreCase);
 
-            return ToTitleCase(
-                match.Groups["name"].Value.Trim());
+                if (match.Success)
+                {
+                    return ToTitleCase(
+                        match.Groups["name"]
+                            .Value
+                            .Trim());
+                }
+            }
+
+            // No recognized contractor-name pattern.
+            // Return blank so the payment row receives
+            // your light-red "needs review" highlighting.
+            return "";
         }
 
         private static string ToTitleCase(string value)
