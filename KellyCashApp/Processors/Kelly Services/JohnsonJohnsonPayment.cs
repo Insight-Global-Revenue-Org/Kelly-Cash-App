@@ -162,21 +162,24 @@ namespace KellyCashApp.Processors.Kelly_Services
                 // -----------------------------------------------------
 
                 string name = "";
-string feeDescription = "";
+                string feeDescription = "";
+                DateTime? feeMonth = null;
 
-if (vmsMatches != null &&
-    vmsMatches.TryGetValue(
-        invoiceId,
-        out JohnsonJohnsonVmsMatch? vmsMatch))
-{
-    name = vmsMatch.WorkerName;
+                if (vmsMatches != null &&
+                    vmsMatches.TryGetValue(
+                    invoiceId,
+                        out JohnsonJohnsonVmsMatch? vmsMatch))
+                {
+                    name = vmsMatch.WorkerName;
 
-    feeDescription = vmsMatch.FeeDescription;
+                    feeDescription = vmsMatch.FeeDescription;
 
-    name = Rename.ApplyNameChange(
-        name,
-        nameChanges);
-}
+                    feeMonth = vmsMatch.FeeMonth;
+
+                    name = Rename.ApplyNameChange(
+                        name,
+                        nameChanges);
+                }
 
                 string concat =
                     string.IsNullOrWhiteSpace(name)
@@ -202,6 +205,27 @@ if (vmsMatches != null &&
                                     name,
                                     StringComparison.OrdinalIgnoreCase))
                             .ToList();
+
+                // -----------------------------------------------------
+                // If the VMS Fee Description gave us a month/year,
+                // only consider OIR invoices from that same month/year.
+                //
+                // If no month/year was parsed, leave possibleMatches
+                // unchanged so the old amount-only behavior is used.
+                // -----------------------------------------------------
+
+                if (feeMonth.HasValue)
+                {
+                    possibleMatches =
+                        possibleMatches
+                            .Where(x =>
+                                x.WeekEndingDate.Month ==
+                                    feeMonth.Value.Month
+                                &&
+                                x.WeekEndingDate.Year ==
+                                    feeMonth.Value.Year)
+                            .ToList();
+                }
 
                 // -----------------------------------------------------
                 // Find ONE OIR invoice.

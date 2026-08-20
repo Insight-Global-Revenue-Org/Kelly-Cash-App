@@ -53,7 +53,12 @@ namespace KellyCashApp.Processors.Kelly_Services
                 }
 
                 string workerName =
-                ExtractWorkerName(feeDescription);
+                    ExtractWorkerName(feeDescription);
+
+                DateTime? feeMonth =
+                    ExtractFeeMonth(feeDescription);
+
+
 
                 // IMPORTANT:
                 // Even if we could not parse a contractor name,
@@ -63,7 +68,8 @@ namespace KellyCashApp.Processors.Kelly_Services
                     new JohnsonJohnsonVmsMatch(
                         InvoiceId: invoiceId,
                         WorkerName: workerName,
-                        FeeDescription: feeDescription
+                        FeeDescription: feeDescription,
+                        FeeMonth: feeMonth
                     );
             }
 
@@ -226,6 +232,105 @@ namespace KellyCashApp.Processors.Kelly_Services
                 match.Groups["name"]
                     .Value
                     .Trim());
+        }
+
+        private static DateTime? ExtractFeeMonth(
+    string feeDescription)
+        {
+            if (string.IsNullOrWhiteSpace(feeDescription))
+                return null;
+
+            string value = Regex.Replace(
+                feeDescription.Trim(),
+                @"\s+",
+                " ");
+
+            string months =
+                @"January|February|March|April|May|June|" +
+                @"July|August|September|October|November|December|" +
+                @"Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec";
+
+            // ---------------------------------------------------------
+            // First try:
+            //
+            // December 2025
+            // Dec. 2025
+            // January 2026
+            // Jan 2026
+            // ---------------------------------------------------------
+
+            Match namedMonthMatch = Regex.Match(
+                value,
+                $@"\b(?<month>{months})\.?\s+(?<year>\d{{4}})\b",
+                RegexOptions.IgnoreCase);
+
+            if (namedMonthMatch.Success)
+            {
+                string monthText =
+                    namedMonthMatch.Groups["month"].Value;
+
+                string yearText =
+                    namedMonthMatch.Groups["year"].Value;
+
+                string combined =
+                    $"{monthText} 1 {yearText}";
+
+                if (DateTime.TryParse(
+                    combined,
+                    out DateTime parsedMonth))
+                {
+                    return new DateTime(
+                        parsedMonth.Year,
+                        parsedMonth.Month,
+                        1);
+                }
+            }
+
+            // ---------------------------------------------------------
+            // Second try:
+            //
+            // WE 10/4/26
+            // WE 12.13.25
+            // 10.11.26
+            // 1/18/2026
+            //
+            // This lets date-based Fee Descriptions provide a month too.
+            // ---------------------------------------------------------
+
+            Match dateMatch = Regex.Match(
+                value,
+                @"\b(?<month>\d{1,2})[./-](?<day>\d{1,2})[./-](?<year>\d{2,4})\b");
+
+            if (dateMatch.Success)
+            {
+                int month =
+                    int.Parse(
+                        dateMatch.Groups["month"].Value);
+
+                int year =
+                    int.Parse(
+                        dateMatch.Groups["year"].Value);
+
+                // Convert:
+                // 26 -> 2026
+                // 25 -> 2025
+                if (year < 100)
+                {
+                    year += 2000;
+                }
+
+                if (month >= 1 &&
+                    month <= 12)
+                {
+                    return new DateTime(
+                        year,
+                        month,
+                        1);
+                }
+            }
+
+            // No usable month/year existed.
+            return null;
         }
 
         private static string ToTitleCase(string value)

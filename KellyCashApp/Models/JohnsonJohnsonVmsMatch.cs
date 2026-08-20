@@ -3,6 +3,7 @@
     internal record JohnsonJohnsonVmsMatch(
         string InvoiceId,
         string WorkerName,
-        string FeeDescription
+        string FeeDescription,
+        DateTime? FeeMonth
     );
 }
