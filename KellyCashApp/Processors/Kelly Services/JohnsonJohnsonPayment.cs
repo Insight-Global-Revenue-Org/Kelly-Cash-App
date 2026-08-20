@@ -509,7 +509,7 @@ namespace KellyCashApp.Processors.Kelly_Services
             List<OirLookupRow> possibleMatches,
             decimal targetAmount)
         {
-            const decimal allowedPercentDifference = 0.02m;
+            const decimal allowedPercentDifference = 0.40m;
 
             if (possibleMatches.Count == 0)
                 return null;
