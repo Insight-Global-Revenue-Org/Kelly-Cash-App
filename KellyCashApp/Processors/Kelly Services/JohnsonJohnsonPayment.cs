@@ -226,6 +226,13 @@ namespace KellyCashApp.Processors.Kelly_Services
                                     feeMonth.Value.Year)
                             .ToList();
                 }
+                else
+                {
+                    // TEMPORARY:
+                    // Do not allow invoice matching when no month/year
+                    // could be parsed from the VMS Fee Description.
+                    possibleMatches.Clear();
+                }
 
                 // -----------------------------------------------------
                 // Find ONE OIR invoice.
