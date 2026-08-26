@@ -713,28 +713,6 @@ namespace KellyCashApp.Processors.Kelly_Services
                         worksheet.Cell(row, 4));
 
                 // ---------------------------------------------------------
-                // RULE 1:
-                // Anything in Item other than exactly "Fees"
-                // gets the very light blue fill.
-                // ---------------------------------------------------------
-
-                bool isFee =
-                    item.Equals(
-                        "Fee",
-                     StringComparison.OrdinalIgnoreCase)
-                    ||
-                    item.Equals(
-                        "Fees",
-                        StringComparison.OrdinalIgnoreCase);
-
-                if (!isFee)
-                {
-                    worksheet.Cell(row, 8)
-                        .Style.Fill.BackgroundColor =
-                        XLColor.FromHtml("#DDEBF7");
-                }
-
-                // ---------------------------------------------------------
                 // RULE 2:
                 // If no contractor name could be parsed from the VMS
                 // Fee Description, highlight the entire row very light red.
@@ -768,17 +746,6 @@ namespace KellyCashApp.Processors.Kelly_Services
                         lastColumn)
                         .Style.Fill.BackgroundColor =
                         XLColor.FromHtml("#F2F2F2");
-
-                    // Reapply the blue Item color because the gray row
-                    // fill above overwrote it.
-                    if (!item.Equals(
-                        "Fees",
-                        StringComparison.OrdinalIgnoreCase))
-                    {
-                        worksheet.Cell(row, 8)
-                            .Style.Fill.BackgroundColor =
-                            XLColor.FromHtml("#DDEBF7");
-                    }
                 }
 
                 // Amount Due of zero stays red text.
