@@ -598,6 +598,163 @@ while (true)
             continue;
         }
 
+        // ================================================================
+        // KENVUE PAYMENT
+        // ================================================================
+
+        if (KenvuePayment.IsKenvueFormat(worksheet))
+        {
+            // Stop generic payment spinner while loading Kenvue VMS.
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Dictionary<string, KenvueVmsMatch>?
+                kenvueVmsMatches = null;
+
+            string kenvueVmsPath =
+                Settings.GetKenvueVmsReportFilePath();
+
+            // ------------------------------------------------------------
+            // Import configured Kenvue VMS report.
+            // ------------------------------------------------------------
+
+            if (!string.IsNullOrWhiteSpace(
+                kenvueVmsPath))
+            {
+                bool vmsLoading = true;
+
+                Task vmsSpinner = Task.Run(() =>
+                {
+                    char[] frames =
+                    {
+                '/',
+                '-',
+                '\\',
+                '|'
+            };
+
+                    int i = 0;
+
+                    while (vmsLoading)
+                    {
+                        Console.SetCursorPosition(
+                            0,
+                            promptTop);
+
+                        Console.Write(
+                            $"Importing Kenvue VMS Report... " +
+                            $"{frames[i++ % frames.Length]}   ");
+
+                        Thread.Sleep(120);
+                    }
+                });
+
+                try
+                {
+                    kenvueVmsMatches =
+                        KenvueVms.Import(
+                            kenvueVmsPath);
+                }
+                finally
+                {
+                    vmsLoading = false;
+
+                    vmsSpinner.Wait();
+
+                    ClearArea(
+                        promptTop,
+                        8);
+                }
+            }
+
+            // ------------------------------------------------------------
+            // Start processor spinner.
+            // ------------------------------------------------------------
+
+            loading = true;
+
+            spinner = Task.Run(() =>
+            {
+                char[] frames =
+                {
+            '/',
+            '-',
+            '\\',
+            '|'
+        };
+
+                int i = 0;
+
+                while (loading)
+                {
+                    Console.SetCursorPosition(
+                        0,
+                        promptTop);
+
+                    Console.Write(
+                        $"Processing Kenvue payment file... " +
+                        $"{frames[i++ % frames.Length]}   ");
+
+                    Thread.Sleep(120);
+                }
+            });
+
+            string kenvueOutputPath =
+                KenvuePayment.Process(
+                    workbook,
+                    worksheet,
+                    inputPath,
+                    openInvoiceMatchesMultiple,
+                    kenvueVmsMatches);
+
+            loading = false;
+
+            spinner.Wait();
+
+            ClearArea(
+                promptTop,
+                8);
+
+            Console.SetCursorPosition(
+                0,
+                promptTop);
+
+            if (kenvueVmsMatches == null)
+            {
+                Console.ForegroundColor =
+                    ConsoleColor.Yellow;
+
+                Console.WriteLine(
+                    "Kenvue payment processed, " +
+                    "but no Kenvue VMS report was configured.");
+
+                Console.ResetColor();
+            }
+            else
+            {
+                Console.WriteLine(
+                    "Kenvue payment processed " +
+                    "successfully with VMS report.");
+            }
+
+            Console.WriteLine(
+                $"Updated file saved to: " +
+                $"{kenvueOutputPath}");
+
+            Console.WriteLine();
+
+            Console.WriteLine(
+                "Press any key to return to the menu...");
+
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+
+            continue;
+        }
 
         // ================================================================
         // JOHNSON & JOHNSON PAYMENT

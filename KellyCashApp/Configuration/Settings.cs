@@ -24,6 +24,8 @@
             Path.Combine(SettingsFolder, "microsoft-vms-report-file-path.txt");
         private static string JohnsonJohnsonVmsReportFilePathFile =>
             Path.Combine(SettingsFolder, "johnson-johnson-vms-report-file-path.txt");
+        private static string KenvueVmsReportFilePathFile =>
+            Path.Combine(SettingsFolder, "kenvue-vms-report-file-path.txt");
         private static string NikeTrackerBoardFilePathFile =>
             Path.Combine(SettingsFolder, "nike-tracker-board-file-path.txt");
 
@@ -169,6 +171,22 @@
             return "";
         }
 
+        public static string GetKenvueVmsReportFilePath()
+        {
+            if (File.Exists(KenvueVmsReportFilePathFile))
+            {
+                string savedPath =
+                    File.ReadAllText(
+                        KenvueVmsReportFilePathFile)
+                    .Trim();
+
+                if (File.Exists(savedPath))
+                    return savedPath;
+            }
+
+            return "";
+        }
+
         public static string GetNikeTrackerBoardFilePath()
         {
             if (File.Exists(NikeTrackerBoardFilePathFile))
@@ -192,11 +210,12 @@
             {
                 "Microsoft VMS Report File Path",
                 "Johnson & Johnson VMS Report File Path",
+                "Kenvue VMS Report File Path",
                 "Nike Tracker Board File Path",
                 "Back"
             }, 0, menuTop);
 
-                if (selected == 3)
+                if (selected == 4)
                     return;
 
                 ConsoleUi.ResetPage(menuTop);
@@ -220,6 +239,16 @@
                 }
 
                 if (selected == 2)
+                {
+                    SaveFilePathSetting(
+                        "Paste the full Excel file path for the Kenvue VMS Report:",
+                        KenvueVmsReportFilePathFile,
+                        menuTop
+                    );
+                }
+
+
+                if (selected == 3)
                 {
                     SaveFilePathSetting(
                         "Paste the full Excel file path for the Nike Tracker Board:",
@@ -308,6 +337,15 @@
                 string.IsNullOrWhiteSpace(GetJohnsonJohnsonVmsReportFilePath())
                     ? "Not set yet"
                     : GetJohnsonJohnsonVmsReportFilePath()
+            );
+            Console.WriteLine();
+
+            Console.WriteLine("Kenvue VMS Report File Path:");
+            Console.WriteLine(
+                string.IsNullOrWhiteSpace(
+                    GetKenvueVmsReportFilePath())
+                    ? "Not set yet"
+                    : GetKenvueVmsReportFilePath()
             );
             Console.WriteLine();
 
