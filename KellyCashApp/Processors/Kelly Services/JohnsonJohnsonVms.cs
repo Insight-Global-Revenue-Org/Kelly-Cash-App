@@ -228,10 +228,16 @@ namespace KellyCashApp.Processors.Kelly_Services
             if (!match.Success)
                 return "";
 
-            return ToTitleCase(
-                match.Groups["name"]
-                    .Value
-                    .Trim());
+            string workerName = match.Groups["name"].Value.Trim();
+
+            // Remove a trailing separator that was pulled into the contractor name.
+            // Handles regular hyphen, en dash, and em dash.
+            workerName = Regex.Replace(
+                workerName,
+                @"\s*[-–—]\s*$",
+                "");
+
+            return ToTitleCase(workerName.Trim());
         }
 
         private static DateTime? ExtractFeeMonth(

@@ -219,11 +219,22 @@ namespace KellyCashApp.Processors.Kelly_Services
                     possibleMatches =
                         possibleMatches
                             .Where(x =>
-                                x.WeekEndingDate.Month ==
-                                    feeMonth.Value.Month
-                                &&
-                                x.WeekEndingDate.Year ==
-                                    feeMonth.Value.Year)
+                            {
+                                int oirMonthIndex =
+                                    (x.WeekEndingDate.Year * 12)
+                                    + x.WeekEndingDate.Month;
+
+                                int feeMonthIndex =
+                                    (feeMonth.Value.Year * 12)
+                                    + feeMonth.Value.Month;
+
+                                int monthDifference =
+                                    Math.Abs(
+                                        oirMonthIndex -
+                                        feeMonthIndex);
+
+                                return monthDifference <= 1;
+                            })
                             .ToList();
                 }
                 else
