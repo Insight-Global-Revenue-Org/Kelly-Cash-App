@@ -281,7 +281,7 @@ namespace KellyCashApp.Processors.Randstad
                     x.ClientProject
                 });
 
-            // For each group of SOWs, attempt to find the best match in the open invoice matches by client project
+            // For each group of SOWs, attempt to find the best match in the open invoice matches by client project. (This is where we control our Nike SOW Reconciliation Parameters, play around to minimize your margin of error, or restrict it completely if needed)
             foreach (var group in sowGroups)
             {
                 var rows = group.ToList();
@@ -289,11 +289,14 @@ namespace KellyCashApp.Processors.Randstad
                 if (!openInvoiceMatchesByClientProject.TryGetValue(group.Key.ClientProject, out List<OirMatch>? projectMatches))
                     continue;
 
+                // allow a 10% difference when attempting to match the total of all currently grouped rows for the same Beeline ID and Client Project.
                 TryApplyMatch(rows, projectMatches, usedInvoices, 0.10m);
 
+                // allow a 5% difference for every possible combination of 2 unmatched SOW rows.
                 foreach (var combo in GetCombinations(rows.Where(x => string.IsNullOrWhiteSpace(x.Invoice)).ToList(), 2))
                     TryApplyMatch(combo, projectMatches, usedInvoices, 0.05m);
 
+                // allow a 5% difference for every possible combination of 3 unmatched SOW rows.
                 foreach (var combo in GetCombinations(rows.Where(x => string.IsNullOrWhiteSpace(x.Invoice)).ToList(), 3))
                     TryApplyMatch(combo, projectMatches, usedInvoices, 0.05m);
 
