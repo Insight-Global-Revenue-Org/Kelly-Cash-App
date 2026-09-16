@@ -448,14 +448,14 @@ namespace KellyCashApp.Processors.Experis
 
 
             // Amount Due
-            worksheet.Column(6)
-                .Style.NumberFormat.Format =
-                "$#,##0.00;($#,##0.00)";
-
-            // Aggregate Amount Paid
             worksheet.Column(7)
                 .Style.NumberFormat.Format =
-                "$#,##0.00;($#,##0.00)";
+                "$#,##0.00;[Red]($#,##0.00)";
+
+            // Aggregate Amount Paid
+            worksheet.Column(8)
+                .Style.NumberFormat.Format =
+                "$#,##0.00;[Red]($#,##0.00)";
 
 
             for (int row = 2;
@@ -473,13 +473,14 @@ namespace KellyCashApp.Processors.Experis
 
             worksheet.Column(1).Width = 30; // Experis End Client
             worksheet.Column(2).Width = 28; // Experis Invoice Number
-            worksheet.Column(3).Width = 24; // Contractor Name
-            worksheet.Column(4).Width = 18; // Week Ending Date
-            worksheet.Column(5).Width = 18; // Invoice
-            worksheet.Column(6).Width = 18; // Amount Due
-            worksheet.Column(7).Width = 24; // Aggregate Amount Paid
-            worksheet.Column(8).Width = 38; // Notes
-            worksheet.Column(9).Width = 32; // Concat
+            worksheet.Column(3).Width = 28; // Payment Reference
+            worksheet.Column(4).Width = 24; // Contractor Name
+            worksheet.Column(5).Width = 18; // Week Ending Date
+            worksheet.Column(6).Width = 18; // Invoice
+            worksheet.Column(7).Width = 18; // Amount Due
+            worksheet.Column(8).Width = 24; // Aggregate Amount Paid
+            worksheet.Column(9).Width = 38; // Notes
+            worksheet.Column(10).Width = 32; // Concat
 
 
             worksheet.Range(
