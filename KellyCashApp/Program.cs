@@ -762,8 +762,6 @@ while (true)
 
         if (JohnsonJohnsonPayment.IsJohnsonJohnsonFormat(worksheet))
         {
-            // Stop the generic "Processing payment file..." spinner
-            // while we load the J&J VMS report.
             loading = false;
             spinner.Wait();
 
