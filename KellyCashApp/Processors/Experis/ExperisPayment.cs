@@ -84,9 +84,10 @@ namespace KellyCashApp.Processors.Experis
             // ---------------------------------------------------------
 
             string[] headers =
-                {
+{
                     "Experis End Client",
                     "Experis Invoice Number",
+                    "Payment Reference",
                     "Contractor Name",
                     "Week Ending Date",
                     "Invoice",
@@ -126,6 +127,7 @@ namespace KellyCashApp.Processors.Experis
                 string endClient =
                     FindEndClient(
                         paymentRow.InvoiceNumber,
+                        paymentRow.PaymentReference,
                         endClientMappings);
 
 
@@ -133,50 +135,40 @@ namespace KellyCashApp.Processors.Experis
                 worksheet.Cell(outputRow, 1).Value =
                     endClient;
 
-
                 // Experis Invoice Number
                 worksheet.Cell(outputRow, 2).Value =
                     paymentRow.InvoiceNumber;
 
+                // Payment Reference
+                worksheet.Cell(outputRow, 3).Value =
+                    paymentRow.PaymentReference;
 
                 // Contractor Name
-                // Blank for now.
-                worksheet.Cell(outputRow, 3).Value =
-                    "";
-
-
-                // Week Ending Date
-                // Blank for now.
                 worksheet.Cell(outputRow, 4).Value =
                     "";
 
-
-                // OIR Invoice
-                // Blank for now.
+                // Week Ending Date
                 worksheet.Cell(outputRow, 5).Value =
                     "";
 
-
-                // Amount Due
-                // Blank for now.
+                // OIR Invoice
                 worksheet.Cell(outputRow, 6).Value =
                     "";
 
-
-                // Aggregate Amount Paid
+                // Amount Due
                 worksheet.Cell(outputRow, 7).Value =
-                    paymentRow.PaidAmount;
-
-
-                // Notes
-                // Blank for now.
-                worksheet.Cell(outputRow, 8).Value =
                     "";
 
+                // Aggregate Amount Paid
+                worksheet.Cell(outputRow, 8).Value =
+                    paymentRow.PaidAmount;
+
+                // Notes
+                worksheet.Cell(outputRow, 9).Value =
+                    "";
 
                 // Concat
-                // Blank for now.
-                worksheet.Cell(outputRow, 9).Value =
+                worksheet.Cell(outputRow, 10).Value =
                     "";
             }
 
@@ -328,6 +320,10 @@ namespace KellyCashApp.Processors.Experis
                         CleanCellText(
                             cells[0]);
 
+                    string paymentReference =
+                        CleanCellText(
+                            cells[2]);
+
                     string paidAmountText =
                         CleanCellText(
                             cells[4]);
@@ -350,14 +346,17 @@ namespace KellyCashApp.Processors.Experis
 
 
                     results.Add(
-                        new ExperisPaymentRow
-                        {
-                            InvoiceNumber =
-                                invoiceNumber,
+                    new ExperisPaymentRow
+                    {
+                        InvoiceNumber =
+                            invoiceNumber,
 
-                            PaidAmount =
-                                paidAmount
-                        });
+                        PaymentReference =
+                            paymentReference,
+
+                        PaidAmount =
+                            paidAmount
+                    });
                 }
             }
 
@@ -646,27 +645,62 @@ namespace KellyCashApp.Processors.Experis
         }
 
         private static string FindEndClient(
-            string invoiceNumber,
-             List<ExperisEndClientMapping> mappings)
+                    string invoiceNumber,
+                    string paymentReference,
+                    List<ExperisEndClientMapping> mappings)
         {
-            if (string.IsNullOrWhiteSpace(invoiceNumber))
-                return "";
+            // ---------------------------------------------------------
+            // 1. Try matching against the Experis Invoice Number first.
+            // ---------------------------------------------------------
+
+            if (!string.IsNullOrWhiteSpace(invoiceNumber))
+            {
+                ExperisEndClientMapping? invoiceMatch =
+                    mappings
+                        .Where(x =>
+                            !string.IsNullOrWhiteSpace(
+                                x.Identifier))
+                        .OrderByDescending(
+                            x => x.Identifier.Length)
+                        .FirstOrDefault(
+                            x => invoiceNumber.Contains(
+                                x.Identifier,
+                                StringComparison.OrdinalIgnoreCase));
+
+                if (invoiceMatch != null)
+                {
+                    return invoiceMatch.EndClient;
+                }
+            }
 
 
-            ExperisEndClientMapping? match =
-                mappings
-                    .Where(x =>
-                        !string.IsNullOrWhiteSpace(
-                            x.Identifier))
-                    .OrderByDescending(
-                        x => x.Identifier.Length)
-                    .FirstOrDefault(
-                        x => invoiceNumber.Contains(
-                            x.Identifier,
-                            StringComparison.OrdinalIgnoreCase));
+            // ---------------------------------------------------------
+            // 2. If Invoice Number did not match, try Payment Reference.
+            // ---------------------------------------------------------
+
+            if (!string.IsNullOrWhiteSpace(paymentReference))
+            {
+                ExperisEndClientMapping? referenceMatch =
+                    mappings
+                        .Where(x =>
+                            !string.IsNullOrWhiteSpace(
+                                x.Identifier))
+                        .OrderByDescending(
+                            x => x.Identifier.Length)
+                        .FirstOrDefault(
+                            x => paymentReference.Contains(
+                                x.Identifier,
+                                StringComparison.OrdinalIgnoreCase));
+
+                if (referenceMatch != null)
+                {
+                    return referenceMatch.EndClient;
+                }
+            }
 
 
-            return match?.EndClient ?? "";
+            // No match in either field.
+            return "";
         }
 
         // =============================================================
@@ -676,6 +710,12 @@ namespace KellyCashApp.Processors.Experis
         private class ExperisPaymentRow
         {
             public string InvoiceNumber
+            {
+                get;
+                set;
+            } = "";
+
+            public string PaymentReference
             {
                 get;
                 set;
