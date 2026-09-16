@@ -28,6 +28,10 @@
             Path.Combine(SettingsFolder, "kenvue-vms-report-file-path.txt");
         private static string NikeTrackerBoardFilePathFile =>
             Path.Combine(SettingsFolder, "nike-tracker-board-file-path.txt");
+        private static string ExperisEndClientMappingFilePathFile =>
+            Path.Combine(
+                SettingsFolder,
+                "experis-end-client-mapping-file-path.txt");
 
         private static string FileSelectionTypeFile =>
              Path.Combine(SettingsFolder, "file-selection-type.txt");
@@ -200,6 +204,22 @@
             return "";
         }
 
+        public static string GetExperisEndClientMappingFilePath()
+        {
+            if (File.Exists(ExperisEndClientMappingFilePathFile))
+            {
+                string savedPath =
+                    File.ReadAllText(
+                        ExperisEndClientMappingFilePathFile)
+                    .Trim();
+
+                if (File.Exists(savedPath))
+                    return savedPath;
+            }
+
+            return "";
+        }
+
         private static void ShowAdditionalReportingSupportMenu(int menuTop)
         {
             while (true)
@@ -207,15 +227,16 @@
                 ConsoleUi.ResetPage(menuTop);
 
                 int selected = ShowMenu(new[]
-            {
-                "Microsoft VMS Report File Path",
-                "Johnson & Johnson VMS Report File Path",
-                "Kenvue VMS Report File Path",
-                "Nike Tracker Board File Path",
-                "Back"
-            }, 0, menuTop);
+                {   
+                    "Microsoft VMS Report File Path",
+                    "Johnson & Johnson VMS Report File Path",
+                    "Kenvue VMS Report File Path",
+                    "Nike Tracker Board File Path",
+                    "Experis End Client Mapping File Path",
+                    "Back"
+                }, 0, menuTop);
 
-                if (selected == 4)
+                if (selected == 5)
                     return;
 
                 ConsoleUi.ResetPage(menuTop);
@@ -253,6 +274,15 @@
                     SaveFilePathSetting(
                         "Paste the full Excel file path for the Nike Tracker Board:",
                         NikeTrackerBoardFilePathFile,
+                        menuTop
+                    );
+                }
+
+                if (selected == 4)
+                {
+                    SaveFilePathSetting(
+                        "Paste the full Excel file path for the Experis End Client Mapping File:",
+                        ExperisEndClientMappingFilePathFile,
                         menuTop
                     );
                 }
@@ -347,6 +377,17 @@
                     ? "Not set yet"
                     : GetKenvueVmsReportFilePath()
             );
+            Console.WriteLine(
+                    "Experis End Client Mapping File Path:");
+
+            Console.WriteLine(
+                string.IsNullOrWhiteSpace(
+                    GetExperisEndClientMappingFilePath())
+                    ? "Not set yet"
+                    : GetExperisEndClientMappingFilePath()
+            );
+
+            Console.WriteLine();
             Console.WriteLine();
 
             Console.WriteLine("Nike Tracker Board File Path:");

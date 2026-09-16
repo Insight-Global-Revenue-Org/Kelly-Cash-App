@@ -60,6 +60,12 @@ namespace KellyCashApp.Processors.Experis
                     "No Experis invoice rows were found in the EML file.");
             }
 
+            // ---------------------------------------------------------
+            // Load optional Experis End Client mapping file.
+            // ---------------------------------------------------------
+
+            List<ExperisEndClientMapping> endClientMappings =
+                LoadEndClientMappings();
 
             // ---------------------------------------------------------
             // 3. Create the output Excel workbook.
@@ -78,16 +84,17 @@ namespace KellyCashApp.Processors.Experis
             // ---------------------------------------------------------
 
             string[] headers =
-            {
-                "Experis Invoice Number",
-                "Contractor Name",
-                "Week Ending Date",
-                "Invoice",
-                "Amount Due",
-                "Aggregate Amount Paid",
-                "Notes",
-                "Concat"
-            };
+                {
+                    "Experis End Client",
+                    "Experis Invoice Number",
+                    "Contractor Name",
+                    "Week Ending Date",
+                    "Invoice",
+                    "Amount Due",
+                    "Aggregate Amount Paid",
+                    "Notes",
+                    "Concat"
+                };
 
             for (int col = 1;
                  col <= headers.Length;
@@ -103,50 +110,73 @@ namespace KellyCashApp.Processors.Experis
             // ---------------------------------------------------------
 
             for (int i = 0;
-                 i < paymentRows.Count;
-                 i++)
+     i < paymentRows.Count;
+     i++)
             {
                 int outputRow = i + 2;
 
                 ExperisPaymentRow paymentRow =
                     paymentRows[i];
 
-                // EML Invoice Number
+
+                // -----------------------------------------------------
+                // Determine Experis End Client from invoice identifier.
+                // -----------------------------------------------------
+
+                string endClient =
+                    FindEndClient(
+                        paymentRow.InvoiceNumber,
+                        endClientMappings);
+
+
+                // Experis End Client
                 worksheet.Cell(outputRow, 1).Value =
+                    endClient;
+
+
+                // Experis Invoice Number
+                worksheet.Cell(outputRow, 2).Value =
                     paymentRow.InvoiceNumber;
 
-                // Contractor Name
-                // Blank for now.
-                worksheet.Cell(outputRow, 2).Value =
-                    "";
 
-                // Week Ending Date
+                // Contractor Name
                 // Blank for now.
                 worksheet.Cell(outputRow, 3).Value =
                     "";
 
-                // OIR Invoice
+
+                // Week Ending Date
                 // Blank for now.
                 worksheet.Cell(outputRow, 4).Value =
                     "";
 
-                // Amount Due
+
+                // OIR Invoice
                 // Blank for now.
                 worksheet.Cell(outputRow, 5).Value =
                     "";
 
-                // EML Paid Amount
+
+                // Amount Due
+                // Blank for now.
                 worksheet.Cell(outputRow, 6).Value =
+                    "";
+
+
+                // Aggregate Amount Paid
+                worksheet.Cell(outputRow, 7).Value =
                     paymentRow.PaidAmount;
+
 
                 // Notes
                 // Blank for now.
-                worksheet.Cell(outputRow, 7).Value =
+                worksheet.Cell(outputRow, 8).Value =
                     "";
+
 
                 // Concat
                 // Blank for now.
-                worksheet.Cell(outputRow, 8).Value =
+                worksheet.Cell(outputRow, 9).Value =
                     "";
             }
 
@@ -418,13 +448,13 @@ namespace KellyCashApp.Processors.Experis
                 15;
 
 
-            // Amount Due.
-            worksheet.Column(5)
+            // Amount Due
+            worksheet.Column(6)
                 .Style.NumberFormat.Format =
                 "$#,##0.00;($#,##0.00)";
 
-            // Aggregate Amount Paid.
-            worksheet.Column(6)
+            // Aggregate Amount Paid
+            worksheet.Column(7)
                 .Style.NumberFormat.Format =
                 "$#,##0.00;($#,##0.00)";
 
@@ -442,15 +472,15 @@ namespace KellyCashApp.Processors.Experis
                 .AdjustToContents();
 
 
-            // Reasonable fixed widths.
-            worksheet.Column(1).Width = 28;
-            worksheet.Column(2).Width = 24;
-            worksheet.Column(3).Width = 18;
-            worksheet.Column(4).Width = 18;
-            worksheet.Column(5).Width = 18;
-            worksheet.Column(6).Width = 24;
-            worksheet.Column(7).Width = 38;
-            worksheet.Column(8).Width = 32;
+            worksheet.Column(1).Width = 30; // Experis End Client
+            worksheet.Column(2).Width = 28; // Experis Invoice Number
+            worksheet.Column(3).Width = 24; // Contractor Name
+            worksheet.Column(4).Width = 18; // Week Ending Date
+            worksheet.Column(5).Width = 18; // Invoice
+            worksheet.Column(6).Width = 18; // Amount Due
+            worksheet.Column(7).Width = 24; // Aggregate Amount Paid
+            worksheet.Column(8).Width = 38; // Notes
+            worksheet.Column(9).Width = 32; // Concat
 
 
             worksheet.Range(
@@ -498,6 +528,137 @@ namespace KellyCashApp.Processors.Experis
             return path;
         }
 
+        private class ExperisEndClientMapping
+        {
+            public string Identifier
+            {
+                get;
+                set;
+            } = "";
+
+            public string EndClient
+            {
+                get;
+                set;
+            } = "";
+        }
+
+        private static List<ExperisEndClientMapping>
+    LoadEndClientMappings()
+        {
+            var mappings =
+                new List<ExperisEndClientMapping>();
+
+
+            // Get configured mapping file.
+            string mappingPath =
+                Settings.GetExperisEndClientMappingFilePath();
+
+
+            // Mapping is optional.
+            // If no valid file is configured, simply return
+            // an empty list and Experis processing continues.
+            if (string.IsNullOrWhiteSpace(mappingPath) ||
+                !File.Exists(mappingPath))
+            {
+                return mappings;
+            }
+
+
+            using var workbook =
+                new XLWorkbook(mappingPath);
+
+
+            // Your mapping workbook uses this worksheet.
+            IXLWorksheet worksheet;
+
+            if (workbook.Worksheets.Any(
+                x => x.Name.Equals(
+                    "EXPERIS END CLIENTS",
+                    StringComparison.OrdinalIgnoreCase)))
+            {
+                worksheet =
+                    workbook.Worksheet(
+                        "EXPERIS END CLIENTS");
+            }
+            else
+            {
+                // Fallback in case the sheet gets renamed.
+                worksheet =
+                    workbook.Worksheet(1);
+            }
+
+
+            // Based on the mapping file:
+            //
+            // A = INVOICE ID
+            // B = IDENTIFIER
+            // C = END CLIENT
+            //
+            // Row 1 = headers.
+
+            int lastRow =
+                worksheet.LastRowUsed()?.RowNumber()
+                ?? 1;
+
+
+            for (int row = 2;
+                 row <= lastRow;
+                 row++)
+            {
+                string identifier =
+                    worksheet.Cell(row, 2)
+                        .GetString()
+                        .Trim();
+
+                string endClient =
+                    worksheet.Cell(row, 3)
+                        .GetString()
+                        .Trim();
+
+
+                if (string.IsNullOrWhiteSpace(identifier) ||
+                    string.IsNullOrWhiteSpace(endClient))
+                {
+                    continue;
+                }
+
+
+                mappings.Add(
+                    new ExperisEndClientMapping
+                    {
+                        Identifier = identifier,
+                        EndClient = endClient
+                    });
+            }
+
+
+            return mappings;
+        }
+
+        private static string FindEndClient(
+            string invoiceNumber,
+             List<ExperisEndClientMapping> mappings)
+        {
+            if (string.IsNullOrWhiteSpace(invoiceNumber))
+                return "";
+
+
+            ExperisEndClientMapping? match =
+                mappings
+                    .Where(x =>
+                        !string.IsNullOrWhiteSpace(
+                            x.Identifier))
+                    .OrderByDescending(
+                        x => x.Identifier.Length)
+                    .FirstOrDefault(
+                        x => invoiceNumber.Contains(
+                            x.Identifier,
+                            StringComparison.OrdinalIgnoreCase));
+
+
+            return match?.EndClient ?? "";
+        }
 
         // =============================================================
         // INTERNAL MODEL
