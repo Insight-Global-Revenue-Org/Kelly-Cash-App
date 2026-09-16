@@ -129,6 +129,9 @@ namespace KellyCashApp.Processors.Experis
                         paymentRow.InvoiceNumber,
                         paymentRow.PaymentReference,
                         endClientMappings);
+                string contractorName =
+                    ExtractContractorName(
+                    paymentRow.InvoiceNumber);
 
 
                 // Experis End Client
@@ -145,7 +148,7 @@ namespace KellyCashApp.Processors.Experis
 
                 // Contractor Name
                 worksheet.Cell(outputRow, 4).Value =
-                    "";
+                    contractorName;
 
                 // Week Ending Date
                 worksheet.Cell(outputRow, 5).Value =
@@ -643,6 +646,35 @@ namespace KellyCashApp.Processors.Experis
 
 
             return mappings;
+        }
+
+        private static string ExtractContractorName(
+            string invoiceNumber)
+        {
+            if (string.IsNullOrWhiteSpace(invoiceNumber))
+                return "";
+
+            var match =
+                System.Text.RegularExpressions.Regex.Match(
+                    invoiceNumber,
+                    @"^\s*\d+\s*-\s*(.+?)\s*$");
+
+            if (!match.Success)
+                return "";
+
+            string name =
+                match.Groups[1]
+                    .Value
+                    .Trim();
+
+            name =
+                System.Text.RegularExpressions.Regex.Replace(
+                    name,
+                    @"\d+$",
+                    "")
+                .Trim();
+
+            return name;
         }
 
         private static string FindEndClient(
