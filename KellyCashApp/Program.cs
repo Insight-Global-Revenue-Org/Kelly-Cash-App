@@ -7,6 +7,7 @@ using KellyCashApp.Processors.Monument;
 using KellyCashApp.Processors.Allegis;
 using KellyCashApp.Processors.Randstad;
 using KellyCashApp.Processors.Guidant;
+using KellyCashApp.Processors.Experis;
 using KellyCashApp.Services;
 using KellyCashApp.Workflows;
 using System.Globalization;
@@ -277,6 +278,82 @@ while (true)
             Console.ReadKey(true);
 
             defaultMenuOption = 1;
+            continue;
+        }
+
+        // ================================================================
+        // EXPERIS EML PAYMENT
+        // ================================================================
+
+        if (ExperisPayment.IsExperisFormat(inputPath))
+        {
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            loading = true;
+
+            spinner = Task.Run(() =>
+            {
+                char[] frames =
+                {
+            '/',
+            '-',
+            '\\',
+            '|'
+        };
+
+                int i = 0;
+
+                while (loading)
+                {
+                    Console.SetCursorPosition(
+                        0,
+                        promptTop);
+
+                    Console.Write(
+                        $"Processing Experis EML payment... " +
+                        $"{frames[i++ % frames.Length]}   ");
+
+                    Thread.Sleep(120);
+                }
+            });
+
+
+            string experisOutputPath =
+                ExperisPayment.Process(
+                    inputPath);
+
+
+            loading = false;
+
+            spinner.Wait();
+
+            ClearArea(
+                promptTop,
+                8);
+
+            Console.SetCursorPosition(
+                0,
+                promptTop);
+
+            Console.WriteLine(
+                "Experis EML payment processed successfully.");
+
+            Console.WriteLine(
+                $"Updated file saved to: {experisOutputPath}");
+
+            Console.WriteLine();
+
+            Console.WriteLine(
+                "Press any key to return to the menu...");
+
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+
             continue;
         }
 

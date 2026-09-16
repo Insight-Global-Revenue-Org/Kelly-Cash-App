@@ -46,7 +46,7 @@ namespace KellyCashApp.Services
                 using OpenFileDialog dialog = new OpenFileDialog();
 
                 dialog.Title = "Select File";
-                dialog.Filter = "Supported Files|*.xlsx;*.xls;*.txt;*.pdf|All Files|*.*";
+                dialog.Filter = "Supported Files|*.xlsx;*.xls;*.txt;*.pdf;*.eml|All Files|*.*";
                 dialog.InitialDirectory = _lastDirectory;
                 dialog.RestoreDirectory = true;
 

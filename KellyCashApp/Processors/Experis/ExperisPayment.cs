@@ -1,0 +1,521 @@
+﻿using ClosedXML.Excel;
+using HtmlAgilityPack;
+using KellyCashApp.Configuration;
+using KellyCashApp.Services;
+using MimeKit;
+using System.Globalization;
+
+namespace KellyCashApp.Processors.Experis
+{
+    internal static class ExperisPayment
+    {
+        // =============================================================
+        // FORMAT DETECTION
+        // =============================================================
+
+        public static bool IsExperisFormat(string inputPath)
+        {
+            // Experis is currently the only payment processor
+            // that accepts an .eml file.
+            return Path.GetExtension(inputPath)
+                .Equals(
+                    ".eml",
+                    StringComparison.OrdinalIgnoreCase);
+        }
+
+
+        // =============================================================
+        // MAIN PROCESSOR
+        // =============================================================
+
+        public static string Process(string inputPath)
+        {
+            // ---------------------------------------------------------
+            // 1. Load the EML file.
+            // ---------------------------------------------------------
+
+            MimeMessage message =
+                MimeMessage.Load(inputPath);
+
+            string htmlBody =
+                message.HtmlBody ?? "";
+
+            if (string.IsNullOrWhiteSpace(htmlBody))
+            {
+                throw new Exception(
+                    "The Experis EML file did not contain an HTML email body.");
+            }
+
+
+            // ---------------------------------------------------------
+            // 2. Extract all Experis invoice rows.
+            // ---------------------------------------------------------
+
+            List<ExperisPaymentRow> paymentRows =
+                ExtractPaymentRows(htmlBody);
+
+            if (paymentRows.Count == 0)
+            {
+                throw new Exception(
+                    "No Experis invoice rows were found in the EML file.");
+            }
+
+
+            // ---------------------------------------------------------
+            // 3. Create the output Excel workbook.
+            // ---------------------------------------------------------
+
+            using var workbook =
+                new XLWorkbook();
+
+            var worksheet =
+                workbook.Worksheets.Add(
+                    "Payment Details");
+
+
+            // ---------------------------------------------------------
+            // 4. Write standardized headers.
+            // ---------------------------------------------------------
+
+            string[] headers =
+            {
+                "Experis Invoice Number",
+                "Contractor Name",
+                "Week Ending Date",
+                "Invoice",
+                "Amount Due",
+                "Aggregate Amount Paid",
+                "Notes",
+                "Concat"
+            };
+
+            for (int col = 1;
+                 col <= headers.Length;
+                 col++)
+            {
+                worksheet.Cell(1, col).Value =
+                    headers[col - 1];
+            }
+
+
+            // ---------------------------------------------------------
+            // 5. Write the EML data into the output worksheet.
+            // ---------------------------------------------------------
+
+            for (int i = 0;
+                 i < paymentRows.Count;
+                 i++)
+            {
+                int outputRow = i + 2;
+
+                ExperisPaymentRow paymentRow =
+                    paymentRows[i];
+
+                // EML Invoice Number
+                worksheet.Cell(outputRow, 1).Value =
+                    paymentRow.InvoiceNumber;
+
+                // Contractor Name
+                // Blank for now.
+                worksheet.Cell(outputRow, 2).Value =
+                    "";
+
+                // Week Ending Date
+                // Blank for now.
+                worksheet.Cell(outputRow, 3).Value =
+                    "";
+
+                // OIR Invoice
+                // Blank for now.
+                worksheet.Cell(outputRow, 4).Value =
+                    "";
+
+                // Amount Due
+                // Blank for now.
+                worksheet.Cell(outputRow, 5).Value =
+                    "";
+
+                // EML Paid Amount
+                worksheet.Cell(outputRow, 6).Value =
+                    paymentRow.PaidAmount;
+
+                // Notes
+                // Blank for now.
+                worksheet.Cell(outputRow, 7).Value =
+                    "";
+
+                // Concat
+                // Blank for now.
+                worksheet.Cell(outputRow, 8).Value =
+                    "";
+            }
+
+
+            // ---------------------------------------------------------
+            // 6. Apply formatting.
+            // ---------------------------------------------------------
+
+            ApplyFormatting(
+                worksheet,
+                paymentRows.Count + 1,
+                headers.Length);
+
+
+            // ---------------------------------------------------------
+            // 7. Calculate total paid amount.
+            // ---------------------------------------------------------
+
+            decimal total =
+                paymentRows.Sum(
+                    x => x.PaidAmount);
+
+
+            // ---------------------------------------------------------
+            // 8. Create output filename.
+            // ---------------------------------------------------------
+
+            string savePath =
+                Settings.GetRemittanceSavePath();
+
+            string formattedTotal =
+                total.ToString(
+                    "$#,##0.00;($#,##0.00)",
+                    CultureInfo.InvariantCulture);
+
+            string processedDate =
+                DateTime.Now.ToString(
+                    "M.d.yyyy",
+                    CultureInfo.InvariantCulture);
+
+            string outputPath =
+                GetUniqueOutputPath(
+                    savePath,
+                    $"Experis {processedDate} - {formattedTotal}.xlsx");
+
+
+            // ---------------------------------------------------------
+            // 9. Save and log.
+            // ---------------------------------------------------------
+
+            workbook.SaveAs(outputPath);
+
+            Analytics.LogRemittanceRun(
+                $"Experis - {formattedTotal}");
+
+            return outputPath;
+        }
+
+
+        // =============================================================
+        // EML / HTML PARSER
+        // =============================================================
+
+        private static List<ExperisPaymentRow> ExtractPaymentRows(
+            string html)
+        {
+            var results =
+                new List<ExperisPaymentRow>();
+
+            var htmlDocument =
+                new HtmlAgilityPack.HtmlDocument();
+
+            htmlDocument.LoadHtml(html);
+
+
+            // ---------------------------------------------------------
+            // Every Experis remittance page contains a table whose
+            // header includes both:
+            //
+            // Invoice Number
+            // Paid Amount
+            //
+            // We locate all tables in the HTML and only process tables
+            // containing those two headers.
+            // ---------------------------------------------------------
+
+            var tables =
+                htmlDocument.DocumentNode
+                    .SelectNodes("//table");
+
+            if (tables == null)
+                return results;
+
+
+            foreach (HtmlNode table in tables)
+            {
+                string tableText =
+                    HtmlEntity.DeEntitize(
+                        table.InnerText);
+
+                if (!tableText.Contains(
+                        "Invoice Number",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (!tableText.Contains(
+                        "Paid Amount",
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+
+                // -----------------------------------------------------
+                // The actual invoice records live inside a nested
+                // five-column table:
+                //
+                // 1 Invoice Number
+                // 2 Invoice Date
+                // 3 Payment Reference
+                // 4 Gross Amount
+                // 5 Paid Amount
+                // -----------------------------------------------------
+
+                var rows =
+                    table.SelectNodes(
+                        ".//table//tr");
+
+                if (rows == null)
+                    continue;
+
+
+                foreach (HtmlNode row in rows)
+                {
+                    var cells =
+                        row.SelectNodes(
+                            "./td");
+
+                    if (cells == null ||
+                        cells.Count != 5)
+                    {
+                        continue;
+                    }
+
+
+                    string invoiceNumber =
+                        CleanCellText(
+                            cells[0]);
+
+                    string paidAmountText =
+                        CleanCellText(
+                            cells[4]);
+
+
+                    // Ignore headers or malformed rows.
+                    if (string.IsNullOrWhiteSpace(
+                        invoiceNumber))
+                    {
+                        continue;
+                    }
+
+
+                    if (!TryParseMoney(
+                        paidAmountText,
+                        out decimal paidAmount))
+                    {
+                        continue;
+                    }
+
+
+                    results.Add(
+                        new ExperisPaymentRow
+                        {
+                            InvoiceNumber =
+                                invoiceNumber,
+
+                            PaidAmount =
+                                paidAmount
+                        });
+                }
+            }
+
+
+            return results;
+        }
+
+
+        // =============================================================
+        // HTML HELPERS
+        // =============================================================
+
+        private static string CleanCellText(
+            HtmlNode cell)
+        {
+            string value =
+                HtmlEntity.DeEntitize(
+                    cell.InnerText);
+
+            return value
+                .Replace("\r", " ")
+                .Replace("\n", " ")
+                .Trim();
+        }
+
+
+        private static bool TryParseMoney(
+            string input,
+            out decimal value)
+        {
+            string cleaned =
+                input
+                    .Replace("$", "")
+                    .Replace(",", "")
+                    .Replace("(", "-")
+                    .Replace(")", "")
+                    .Trim();
+
+            return decimal.TryParse(
+                cleaned,
+                NumberStyles.Any,
+                CultureInfo.InvariantCulture,
+                out value);
+        }
+
+
+        // =============================================================
+        // EXCEL FORMATTING
+        // =============================================================
+
+        private static void ApplyFormatting(
+            IXLWorksheet worksheet,
+            int lastRow,
+            int lastColumn)
+        {
+            var range =
+                worksheet.Range(
+                    1,
+                    1,
+                    lastRow,
+                    lastColumn);
+
+            range.Style.Font.FontName =
+                "Aptos Narrow";
+
+            range.Style.Font.FontSize =
+                9;
+
+            range.Style.Border.OutsideBorder =
+                XLBorderStyleValues.Thin;
+
+            range.Style.Border.InsideBorder =
+                XLBorderStyleValues.Thin;
+
+            range.Style.Alignment.Vertical =
+                XLAlignmentVerticalValues.Center;
+
+
+            // Header.
+            worksheet.Row(1)
+                .Style.Font.Bold = true;
+
+            worksheet.Row(1)
+                .Style.Fill.BackgroundColor =
+                XLColor.FromHtml("#FCE4D6");
+
+            worksheet.Row(1).Height =
+                15;
+
+
+            // Amount Due.
+            worksheet.Column(5)
+                .Style.NumberFormat.Format =
+                "$#,##0.00;($#,##0.00)";
+
+            // Aggregate Amount Paid.
+            worksheet.Column(6)
+                .Style.NumberFormat.Format =
+                "$#,##0.00;($#,##0.00)";
+
+
+            for (int row = 2;
+                 row <= lastRow;
+                 row++)
+            {
+                worksheet.Row(row).Height =
+                    13;
+            }
+
+
+            worksheet.Columns()
+                .AdjustToContents();
+
+
+            // Reasonable fixed widths.
+            worksheet.Column(1).Width = 28;
+            worksheet.Column(2).Width = 24;
+            worksheet.Column(3).Width = 18;
+            worksheet.Column(4).Width = 18;
+            worksheet.Column(5).Width = 18;
+            worksheet.Column(6).Width = 24;
+            worksheet.Column(7).Width = 38;
+            worksheet.Column(8).Width = 32;
+
+
+            worksheet.Range(
+                    1,
+                    1,
+                    lastRow,
+                    lastColumn)
+                .SetAutoFilter();
+        }
+
+
+        // =============================================================
+        // FILE SAVE HELPER
+        // =============================================================
+
+        private static string GetUniqueOutputPath(
+            string folderPath,
+            string fileName)
+        {
+            string name =
+                Path.GetFileNameWithoutExtension(
+                    fileName);
+
+            string extension =
+                Path.GetExtension(
+                    fileName);
+
+            string path =
+                Path.Combine(
+                    folderPath,
+                    fileName);
+
+            int counter = 1;
+
+            while (File.Exists(path))
+            {
+                path =
+                    Path.Combine(
+                        folderPath,
+                        $"{name} ({counter}){extension}");
+
+                counter++;
+            }
+
+            return path;
+        }
+
+
+        // =============================================================
+        // INTERNAL MODEL
+        // =============================================================
+
+        private class ExperisPaymentRow
+        {
+            public string InvoiceNumber
+            {
+                get;
+                set;
+            } = "";
+
+            public decimal PaidAmount
+            {
+                get;
+                set;
+            }
+        }
+    }
+}
