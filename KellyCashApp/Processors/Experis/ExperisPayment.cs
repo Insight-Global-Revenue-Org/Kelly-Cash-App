@@ -624,12 +624,21 @@ namespace KellyCashApp.Processors.Experis
                 }
 
 
-                mappings.Add(
-                    new ExperisEndClientMapping
-                    {
-                        Identifier = identifier,
-                        EndClient = endClient
-                    });
+                string[] identifiers =
+                    identifier.Split(
+                        ',',
+                        StringSplitOptions.RemoveEmptyEntries |
+                        StringSplitOptions.TrimEntries);
+
+                foreach (string individualIdentifier in identifiers)
+                {
+                    mappings.Add(
+                        new ExperisEndClientMapping
+                        {
+                            Identifier = individualIdentifier,
+                            EndClient = endClient
+                        });
+                }
             }
 
 
