@@ -3,6 +3,7 @@ using HtmlAgilityPack;
 using KellyCashApp.Configuration;
 using KellyCashApp.Services;
 using MimeKit;
+using System.Text.RegularExpressions;
 using System.Globalization;
 
 namespace KellyCashApp.Processors.Experis
@@ -129,6 +130,9 @@ namespace KellyCashApp.Processors.Experis
                         paymentRow.InvoiceNumber,
                         paymentRow.PaymentReference,
                         endClientMappings);
+                string contractorName =
+                    ExtractContractorName(
+                    paymentRow.InvoiceNumber);
 
 
                 // Experis End Client
@@ -145,7 +149,7 @@ namespace KellyCashApp.Processors.Experis
 
                 // Contractor Name
                 worksheet.Cell(outputRow, 4).Value =
-                    "";
+                    contractorName;
 
                 // Week Ending Date
                 worksheet.Cell(outputRow, 5).Value =
@@ -643,6 +647,55 @@ namespace KellyCashApp.Processors.Experis
 
 
             return mappings;
+        }
+
+        private static string ExtractContractorName(
+                string invoiceNumber)
+        {
+            if (string.IsNullOrWhiteSpace(invoiceNumber))
+                return "";
+
+            // Required format:
+            //
+            // Exactly 4 digits
+            // Optional spaces
+            // A hyphen
+            // Optional spaces
+            // Contractor name
+            //
+            // Examples:
+            // 1234-John Smith
+            // 1234 - John Smith
+            // 1234-John Smith1
+            // 1234 - John Smith2
+
+            Match match =
+                Regex.Match(
+                    invoiceNumber,
+                    @"^\s*\d{4}\s*-\s*([A-Za-z][A-Za-z .'-]*\d*)\s*$");
+
+            if (!match.Success)
+                return "";
+
+            string name =
+                match.Groups[1]
+                    .Value
+                    .Trim();
+
+            // Remove numbers from the END of the contractor name.
+            //
+            // John Smith1  -> John Smith
+            // John Smith2  -> John Smith
+            // John Smith12 -> John Smith
+
+            name =
+                Regex.Replace(
+                    name,
+                    @"\d+$",
+                    "")
+                .Trim();
+
+            return name;
         }
 
         private static string FindEndClient(
