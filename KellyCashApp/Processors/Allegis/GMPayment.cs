@@ -50,14 +50,37 @@ namespace KellyCashApp.Processors.Allegis
                 List<GMExpenseMatch>? expenseMatches = null,
             Dictionary<string, List<GMVmsMatch>>? vmsMatches = null)
         {
-            int gmInvoiceCol = FindColumn(worksheet, HeaderRow, "Consolidated Invoice ID");
-            int workerCol = FindColumn(worksheet, HeaderRow, "Worker");
+            int gmInvoiceCol =
+                FindColumn(
+                    worksheet,
+                    HeaderRow,
+                    "Consolidated Invoice ID");
+
+            int gmInvoiceIdCol =
+                FindColumn(
+                    worksheet,
+                    HeaderRow,
+                    "Invoice ID");
+
+            int workerCol =
+                FindColumn(
+                    worksheet,
+                    HeaderRow,
+                    "Worker");
             int lineItemEndDateCol = FindColumn(worksheet, HeaderRow, "Invoice Line Item End Date");
             int aggregateAmountCol = FindColumn(worksheet, HeaderRow, "Total Invoice Line Item Amount (Supplier)");
             int taxCol = FindColumn(worksheet, HeaderRow, "Invoice Line Item Total Tax Amount (Supplier)");
 
-            if (gmInvoiceCol == -1 || workerCol == -1 || lineItemEndDateCol == -1 || aggregateAmountCol == -1 || taxCol == -1)
-                throw new Exception("Missing one or more required GM remittance columns.");
+            if (gmInvoiceCol == -1 ||
+                gmInvoiceIdCol == -1 ||
+                workerCol == -1 ||
+                lineItemEndDateCol == -1 ||
+                aggregateAmountCol == -1 ||
+                taxCol == -1)
+            {
+                throw new Exception(
+                    "Missing one or more required GM remittance columns.");
+            }
 
             var oirRows = BuildOirRows(openInvoiceMatches);
 
@@ -110,36 +133,6 @@ namespace KellyCashApp.Processors.Allegis
                 // Recover it from the configured GM Expense Report.
                 if (isExpense)
                 {
-
-                    if (expenseMatches == null)
-                    {
-                        Console.WriteLine(
-                            $"GM EXPENSE DEBUG: expenseMatches is NULL for payment row {row}");
-                    }
-                    else
-                    {
-                        Console.WriteLine(
-                            $"GM EXPENSE DEBUG: Payment row {row} | " +
-                            $"Date={lineItemEndDate:MM/dd/yyyy} | " +
-                            $"Amount={aggregateAmount:C} | " +
-                            $"Expense report rows loaded={expenseMatches.Count}");
-
-                        var amountMatches = expenseMatches
-                            .Where(x =>
-                                Math.Abs(x.Amount - aggregateAmount) <= 0.01m)
-                            .ToList();
-
-                        Console.WriteLine(
-                            $"Amount matches found: {amountMatches.Count}");
-
-                        foreach (var candidate in amountMatches.Take(10))
-                        {
-                            Console.WriteLine(
-                                $"  CSV: {candidate.ContractorName} | " +
-                                $"{candidate.Amount:C} | " +
-                                $"{candidate.Date:MM/dd/yyyy}");
-                        }
-                    }
                     GMExpenseMatch? expenseMatch = expenseMatches?
                         .Where(x =>
                             Math.Abs(
@@ -194,9 +187,19 @@ namespace KellyCashApp.Processors.Allegis
                 if (lineItemEndDate == DateTime.MinValue)
                     continue;
 
+                // Consolidated Invoice ID
                 string gmInvoice =
-                worksheet.Cell(row, gmInvoiceCol).GetString().Trim();
+                    worksheet.Cell(row, gmInvoiceCol)
+                        .GetString()
+                        .Trim();
 
+                // Individual GM Invoice ID
+                string gmInvoiceId =
+                    worksheet.Cell(row, gmInvoiceIdCol)
+                        .GetString()
+                        .Trim();
+
+                // VMS Identifier continues to come from Consolidated Invoice ID
                 string vmsIdentifier =
                     new string(gmInvoice
                         .Where(char.IsDigit)
@@ -235,6 +238,7 @@ namespace KellyCashApp.Processors.Allegis
 
                     gmInvoice = gmInvoice,
                     VmsIdentifier = vmsIdentifier,
+                    GMInvoiceId = gmInvoiceId,
 
                     AggregationKey = aggregationKey,
 
@@ -281,7 +285,13 @@ namespace KellyCashApp.Processors.Allegis
                     .Where(x => !string.IsNullOrWhiteSpace(x))
                     .Distinct(StringComparer.OrdinalIgnoreCase)),
 
-            VmsIdentifier = first.VmsIdentifier,
+                     VmsIdentifier = first.VmsIdentifier,
+
+                        GMInvoiceId = string.Join(
+                ", ",
+                group.Select(x => x.GMInvoiceId)
+        .Where(x => !string.IsNullOrWhiteSpace(x))
+        .Distinct(StringComparer.OrdinalIgnoreCase)),
 
             AggregationKey = first.AggregationKey,
 
@@ -372,8 +382,9 @@ namespace KellyCashApp.Processors.Allegis
                 "Notes",
                 "Type",
                 "Concat",
-                "GM Invoice",
+                "Consolidated Invoice",
                 "VMS Identifier",
+                "GM Invoice ID",
                 "Invoiced Net",
                 "Hours",
                 "RT Rate",
@@ -400,11 +411,12 @@ namespace KellyCashApp.Processors.Allegis
                 worksheet.Cell(row, 9).Value = item.Concat;
                 worksheet.Cell(row, 10).Value = item.gmInvoice;
                 worksheet.Cell(row, 11).Value = item.VmsIdentifier;
-                worksheet.Cell(row, 12).Value = item.AggregateInvoicedNet;
-                worksheet.Cell(row, 13).Value = item.Hours;
-                worksheet.Cell(row, 14).Value = item.RtRate;
-                worksheet.Cell(row, 15).Value = item.OtRate;
-                worksheet.Cell(row, 16).Value = item.DtRate;
+                worksheet.Cell(row, 12).Value = item.GMInvoiceId;
+                worksheet.Cell(row, 13).Value = item.AggregateInvoicedNet;
+                worksheet.Cell(row, 14).Value = item.Hours;
+                worksheet.Cell(row, 15).Value = item.RtRate;
+                worksheet.Cell(row, 16).Value = item.OtRate;
+                worksheet.Cell(row, 17).Value = item.DtRate;
 
                 worksheet.Row(row).AdjustToContents();
             }
@@ -498,27 +510,28 @@ namespace KellyCashApp.Processors.Allegis
 
             worksheet.Column(8).Width = 12;  // Type
             worksheet.Column(9).Width = 32;  // Concat
-            worksheet.Column(10).Width = 20; // GM Invoice
+            worksheet.Column(10).Width = 20; // Consolidated Invoice
             worksheet.Column(11).Width = 12; // VMS Identifier
-            worksheet.Column(12).Width = 12; // Invoiced Net
-            worksheet.Column(13).Width = 12; // Hours
-            worksheet.Column(14).Width = 12; // RT Rate
-            worksheet.Column(15).Width = 12; // OT Rate
-            worksheet.Column(16).Width = 12; // DT Rate
-
-            worksheet.Column(12).Style.NumberFormat.Format =
-                "$#,##0.00;($#,##0.00)";
+            worksheet.Column(12).Width = 20; // GM Invoice ID
+            worksheet.Column(13).Width = 12; // Invoiced Net
+            worksheet.Column(14).Width = 12; // Hours
+            worksheet.Column(15).Width = 12; // RT Rate
+            worksheet.Column(16).Width = 12; // OT Rate
+            worksheet.Column(17).Width = 12; // DT Rate
 
             worksheet.Column(13).Style.NumberFormat.Format =
-                "0.00";
+                "$#,##0.00;($#,##0.00)";
 
             worksheet.Column(14).Style.NumberFormat.Format =
-                "$#,##0.00;($#,##0.00)";
+                "0.00";
 
             worksheet.Column(15).Style.NumberFormat.Format =
                 "$#,##0.00;($#,##0.00)";
 
             worksheet.Column(16).Style.NumberFormat.Format =
+                "$#,##0.00;($#,##0.00)";
+
+            worksheet.Column(17).Style.NumberFormat.Format =
                 "$#,##0.00;($#,##0.00)";
 
             for (int row = 2; row <= lastRow; row++)
@@ -527,7 +540,7 @@ namespace KellyCashApp.Processors.Allegis
 
                 if (amountDue <= 0)
                 {
-                    worksheet.Range(row, 1, row, 16)
+                    worksheet.Range(row, 1, row, 17)
                         .Style.Fill.BackgroundColor =
                         XLColor.FromHtml("#F2F2F2");
                 }
@@ -677,6 +690,7 @@ namespace KellyCashApp.Processors.Allegis
             public string Concat { get; set; } = "";
             public string gmInvoice { get; set; } = "";
             public string VmsIdentifier { get; set; } = "";
+            public string GMInvoiceId { get; set; } = "";
 
             // Internal only — used to control grouping.
             public string AggregationKey { get; set; } = "";
