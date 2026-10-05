@@ -29,7 +29,7 @@ namespace KellyCashApp.Processors.Allegis
                     continue;
 
                 return customer.Equals(
-                    "SAP NATIONAL",
+                    "SAP NATIONAL SECURITY SERVICES, INC.",
                 StringComparison.OrdinalIgnoreCase);
             }
 
