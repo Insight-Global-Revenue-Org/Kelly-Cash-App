@@ -421,64 +421,6 @@ while (true)
             continue;
         }
 
-        // Conditional check for SAP payments (Re-routing)
-        if (SAPPayment.IsSAPFormat(worksheet))
-        {
-            loading = false;
-            spinner.Wait();
-
-            ClearArea(promptTop, 8);
-            Console.SetCursorPosition(0, promptTop);
-
-            loading = true;
-
-            spinner = Task.Run(() =>
-            {
-                char[] frames = { '/', '-', '\\', '|' };
-                int i = 0;
-
-                while (loading)
-                {
-                    Console.SetCursorPosition(0, promptTop);
-
-                    Console.Write(
-                        $"Processing SAP payment file... " +
-                        $"{frames[i++ % frames.Length]}   ");
-
-                    Thread.Sleep(120);
-                }
-            });
-
-            string sapOutputPath = SAPPayment.Process(
-                workbook,
-                worksheet,
-                inputPath,
-                openInvoiceMatchesMultiple
-            );
-
-            loading = false;
-            spinner.Wait();
-
-            ClearArea(promptTop, 8);
-            Console.SetCursorPosition(0, promptTop);
-
-            Console.WriteLine(
-                "SAP payment processed successfully.");
-
-            Console.WriteLine(
-                $"Updated file saved to: {sapOutputPath}");
-
-            Console.WriteLine();
-
-            Console.WriteLine(
-                "Press any key to return to the menu...");
-
-            Console.ReadKey(true);
-
-            defaultMenuOption = 1;
-            continue;
-        }
-
         // Conditional check for SAIC payments
         if (SAICPayment.IsSAICFormat(worksheet))
         {
@@ -539,6 +481,66 @@ while (true)
             defaultMenuOption = 1;
             continue;
         }
+
+        // Conditional check for SAP payments (Re-routing)
+        if (SAPPayment.IsSAPFormat(worksheet))
+        {
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            loading = true;
+
+            spinner = Task.Run(() =>
+            {
+                char[] frames = { '/', '-', '\\', '|' };
+                int i = 0;
+
+                while (loading)
+                {
+                    Console.SetCursorPosition(0, promptTop);
+
+                    Console.Write(
+                        $"Processing SAP payment file... " +
+                        $"{frames[i++ % frames.Length]}   ");
+
+                    Thread.Sleep(120);
+                }
+            });
+
+            string sapOutputPath = SAPPayment.Process(
+                workbook,
+                worksheet,
+                inputPath,
+                openInvoiceMatchesMultiple
+            );
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine(
+                "SAP payment processed successfully.");
+
+            Console.WriteLine(
+                $"Updated file saved to: {sapOutputPath}");
+
+            Console.WriteLine();
+
+            Console.WriteLine(
+                "Press any key to return to the menu...");
+
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
+       
 
         // -------- Main Conditional loop for all Allegis Payments! --------
         // Conditional check for Microsoft payments (Re-Routing)

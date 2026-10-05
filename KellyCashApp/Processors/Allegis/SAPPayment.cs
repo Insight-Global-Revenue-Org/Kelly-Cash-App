@@ -14,23 +14,29 @@ namespace KellyCashApp.Processors.Allegis
 
         public static bool IsSAPFormat(IXLWorksheet worksheet)
         {
-            int customerCol = FindColumn(worksheet, HeaderRow, "Customer");
+            int customerCol =
+                FindColumn(worksheet, HeaderRow, "Customer");
 
             if (customerCol == -1)
                 return false;
 
-            int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? FirstDataRow;
+            int lastRow =
+                worksheet.LastRowUsed()?.RowNumber()
+                ?? FirstDataRow;
 
             for (int row = FirstDataRow; row <= lastRow; row++)
             {
-                string customer = worksheet.Cell(row, customerCol).GetString().Trim();
+                string customer =
+                    worksheet.Cell(row, customerCol)
+                        .GetString()
+                        .Trim();
 
-                if (string.IsNullOrWhiteSpace(customer))
-                    continue;
-
-                return customer.Equals(
+                if (customer.Equals(
                     "SAP NATIONAL SECURITY SERVICES, INC.",
-                StringComparison.OrdinalIgnoreCase);
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
             }
 
             return false;

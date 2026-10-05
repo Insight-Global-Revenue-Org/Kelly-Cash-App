@@ -14,23 +14,29 @@ namespace KellyCashApp.Processors.Allegis
 
         public static bool IsSAICFormat(IXLWorksheet worksheet)
         {
-            int customerCol = FindColumn(worksheet, HeaderRow, "Customer");
+            int customerCol =
+                FindColumn(worksheet, HeaderRow, "Customer");
 
             if (customerCol == -1)
                 return false;
 
-            int lastRow = worksheet.LastRowUsed()?.RowNumber() ?? FirstDataRow;
+            int lastRow =
+                worksheet.LastRowUsed()?.RowNumber()
+                ?? FirstDataRow;
 
             for (int row = FirstDataRow; row <= lastRow; row++)
             {
-                string customer = worksheet.Cell(row, customerCol).GetString().Trim();
+                string customer =
+                    worksheet.Cell(row, customerCol)
+                        .GetString()
+                        .Trim();
 
-                if (string.IsNullOrWhiteSpace(customer))
-                    continue;
-
-                return customer.Equals(
+                if (customer.Equals(
                     "SAIC - (NSAI)",
-                StringComparison.OrdinalIgnoreCase);
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
             }
 
             return false;
@@ -299,11 +305,11 @@ namespace KellyCashApp.Processors.Allegis
 
             string outputPath = GetUniqueOutputPath(
             downloadsPath,
-            $"SAP {processedDate} - {formattedTotal}.xlsx");
+            $"SAIC {processedDate} - {formattedTotal}.xlsx");
 
             workbook.SaveAs(outputPath);
 
-            Analytics.LogRemittanceRun($"SAP - {formattedTotal}");
+            Analytics.LogRemittanceRun($"SAIC - {formattedTotal}");
 
             return outputPath;
         }
@@ -376,7 +382,7 @@ namespace KellyCashApp.Processors.Allegis
             worksheet.Column(7).Width = 42;  // Notes
             worksheet.Column(7).Style.Alignment.WrapText = false;
             worksheet.Column(8).Width = 32;  // Concat
-            worksheet.Column(9).Width = 20;  // SAP Invoice
+            worksheet.Column(9).Width = 20;  // SAIC Invoice
             worksheet.Column(10).Width = 12; // VMS Identifier
             worksheet.Column(11).Width = 12; // Invoiced Net
             worksheet.Column(12).Width = 12; // Hours
