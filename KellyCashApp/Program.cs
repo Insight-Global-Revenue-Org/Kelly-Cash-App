@@ -482,6 +482,64 @@ while (true)
             continue;
         }
 
+        // Conditional check for GM payments
+        if (GMPayment.IsGMFormat(worksheet))
+        {
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            loading = true;
+
+            spinner = Task.Run(() =>
+            {
+                char[] frames = { '/', '-', '\\', '|' };
+                int i = 0;
+
+                while (loading)
+                {
+                    Console.SetCursorPosition(0, promptTop);
+
+                    Console.Write(
+                        $"Processing GM payment file... " +
+                        $"{frames[i++ % frames.Length]}   ");
+
+                    Thread.Sleep(120);
+                }
+            });
+
+            string gmOutputPath = GMPayment.Process(
+                workbook,
+                worksheet,
+                inputPath,
+                openInvoiceMatchesMultiple
+            );
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine(
+                "GM payment processed successfully.");
+
+            Console.WriteLine(
+                $"Updated file saved to: {gmOutputPath}");
+
+            Console.WriteLine();
+
+            Console.WriteLine(
+                "Press any key to return to the menu...");
+
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
         // Conditional check for SAP payments (Re-routing)
         if (SAPPayment.IsSAPFormat(worksheet))
         {

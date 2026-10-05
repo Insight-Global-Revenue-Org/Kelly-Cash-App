@@ -20,6 +20,8 @@
         private static string NameChangeFilePathFile =>
             Path.Combine(SettingsFolder, "name-change-file-path.txt");
 
+        private static string GMExpenseReportFilePathFile =>
+    Path.Combine(SettingsFolder, "gm-expense-report-file-path.txt");
         private static string MicrosoftVmsReportFilePathFile =>
             Path.Combine(SettingsFolder, "microsoft-vms-report-file-path.txt");
         private static string JohnsonJohnsonVmsReportFilePathFile =>
@@ -148,6 +150,20 @@
             return "";
         }
 
+        public static string GetGMExpenseReportFilePath()
+        {
+            if (File.Exists(GMExpenseReportFilePathFile))
+            {
+                string savedPath =
+                    File.ReadAllText(GMExpenseReportFilePathFile).Trim();
+
+                if (File.Exists(savedPath))
+                    return savedPath;
+            }
+
+            return "";
+        }
+
         public static string GetMicrosoftVmsReportFilePath()
         {
             if (File.Exists(MicrosoftVmsReportFilePathFile))
@@ -227,7 +243,8 @@
                 ConsoleUi.ResetPage(menuTop);
 
                 int selected = ShowMenu(new[]
-                {   
+                {
+                    "GM Expense Report File Path",
                     "Microsoft VMS Report File Path",
                     "Johnson & Johnson VMS Report File Path",
                     "Kenvue VMS Report File Path",
@@ -236,12 +253,21 @@
                     "Back"
                 }, 0, menuTop);
 
-                if (selected == 5)
+                if (selected == 6)
                     return;
 
                 ConsoleUi.ResetPage(menuTop);
 
                 if (selected == 0)
+                {
+                    SaveFilePathSetting(
+                        "Paste the full CSV file path for the GM Expense Report:",
+                        GMExpenseReportFilePathFile,
+                        menuTop
+                    );
+                }
+
+                if (selected == 1)
                 {
                     SaveFilePathSetting(
                         "Paste the full Excel file path for the Microsoft VMS Report:",
@@ -250,7 +276,7 @@
                     );
                 }
 
-                if (selected == 1)
+                if (selected == 2)
                 {
                     SaveFilePathSetting(
                         "Paste the full Excel file path for the Johnson & Johnson VMS Report:",
@@ -259,7 +285,7 @@
                     );
                 }
 
-                if (selected == 2)
+                if (selected == 3)
                 {
                     SaveFilePathSetting(
                         "Paste the full Excel file path for the Kenvue VMS Report:",
@@ -269,7 +295,7 @@
                 }
 
 
-                if (selected == 3)
+                if (selected == 4)
                 {
                     SaveFilePathSetting(
                         "Paste the full Excel file path for the Nike Tracker Board:",
@@ -278,7 +304,7 @@
                     );
                 }
 
-                if (selected == 4)
+                if (selected == 5)
                 {
                     SaveFilePathSetting(
                         "Paste the full Excel file path for the Experis End Client Mapping File:",
@@ -356,6 +382,14 @@
 
             Console.WriteLine("Name Change File Path:");
             Console.WriteLine(string.IsNullOrWhiteSpace(GetNameChangeFilePath()) ? "Not set yet" : GetNameChangeFilePath());
+            Console.WriteLine();
+
+            Console.WriteLine("GM Expense Report File Path:");
+            Console.WriteLine(
+                string.IsNullOrWhiteSpace(GetGMExpenseReportFilePath())
+                    ? "Not set yet"
+                    : GetGMExpenseReportFilePath()
+            );
             Console.WriteLine();
 
             Console.WriteLine("Microsoft VMS Report File Path:");
