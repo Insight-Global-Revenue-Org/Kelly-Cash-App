@@ -240,9 +240,12 @@ namespace KellyCashApp.Processors.Allegis
             worksheet.Clear(XLClearOptions.All);
             worksheet.Style.Fill.SetBackgroundColor(XLColor.NoColor);
 
+            // New name for output sheet :)
+            worksheet.Name = "Reconciliation Notes";
+
             string[] headers =
             {
-                "Invoice Line Item End Date",
+                "Week Ending Date",
                 "Name",
                 "Invoice",
                 "Amount Due",
