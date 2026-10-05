@@ -112,9 +112,7 @@ namespace KellyCashApp.Processors.Allegis
                 {
                     GMExpenseMatch? expenseMatch = expenseMatches?
                         .Where(x =>
-                            Math.Abs(
-                                (x.Date.Date - lineItemEndDate.Date).Days) <= 1
-                            &&
+                            
                             Math.Abs(
                                 x.Amount - aggregateAmount) <= 0.01m)
                         .OrderBy(x =>
