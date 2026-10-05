@@ -491,6 +491,25 @@ while (true)
             ClearArea(promptTop, 8);
             Console.SetCursorPosition(0, promptTop);
 
+            // ---------------------------------------------------------
+            // Load configured GM Expense Report
+            // ---------------------------------------------------------
+            string gmExpensePath =
+                Settings.GetGMExpenseReportFilePath();
+
+            if (string.IsNullOrWhiteSpace(gmExpensePath))
+            {
+                throw new Exception(
+                    "GM Expense Report File Path is not configured. " +
+                    "Set it under Settings > Additional Reporting Support.");
+            }
+
+            List<GMExpenseMatch> gmExpenseMatches =
+                GMExpense.Import(gmExpensePath);
+
+            // ---------------------------------------------------------
+            // Start GM payment spinner
+            // ---------------------------------------------------------
             loading = true;
 
             spinner = Task.Run(() =>
@@ -510,11 +529,15 @@ while (true)
                 }
             });
 
+            // ---------------------------------------------------------
+            // Pass expense matches into GMPayment.Process
+            // ---------------------------------------------------------
             string gmOutputPath = GMPayment.Process(
                 workbook,
                 worksheet,
                 inputPath,
-                openInvoiceMatchesMultiple
+                openInvoiceMatchesMultiple,
+                gmExpenseMatches
             );
 
             loading = false;
