@@ -26,55 +26,42 @@ namespace KellyCashApp.Processors.Allegis
             if (headers == null)
                 return matches;
 
-            // ------------------------------------------------------------
-            // Dynamically locate the contractor-name column.
-            //
-            // Only use the column whose header CONTAINS:
-            // "ProjectMilestonePayment"
-            // ------------------------------------------------------------
             int contractorNameCol =
                 FindHeaderContaining(
                     headers,
-                    "ProjectMilestonePayment");
+                    "ProjectMilestonePayment_PaymentName");
 
-            // ------------------------------------------------------------
-            // Dynamically locate the date column.
-            //
-            // Only use the column whose header CONTAINS:
-            // "PaymentSubmittedDate"
-            // ------------------------------------------------------------
+            int paymentAmountCol =
+                FindHeaderContaining(
+                    headers,
+                    "vCombinedSpend_InvoicedGross");
+
             int paymentSubmittedDateCol =
                 FindHeaderContaining(
                     headers,
-                    "PaymentSubmittedDate");
+                    "ProjectMilestonePayment_PaymentSubmittedDate");
 
-            // ------------------------------------------------------------
-            // Payment amount remains CSV column M.
-            //
-            // Excel/CSV:
-            // M = column 13
-            //
-            // C# array index:
-            // M = index 12
-            // ------------------------------------------------------------
-            const int paymentAmountCol = 12;
-
-            // ------------------------------------------------------------
-            // Required columns must exist.
-            // ------------------------------------------------------------
             if (contractorNameCol == -1)
             {
                 throw new Exception(
-                    "GM Expense Report does not contain a header " +
-                    "with 'ProjectMilestonePayment'.");
+                    "Could not find GM expense contractor-name column: " +
+                    "ProjectMilestonePayment_PaymentName");
+            }
+
+            if (paymentAmountCol == -1)
+            {
+                throw new Exception(
+                    "Could not find GM expense amount column: " +
+                    "vCombinedSpend_InvoicedGross");
             }
 
             if (paymentSubmittedDateCol == -1)
             {
                 throw new Exception(
-                    "GM Expense Report does not contain a header " +
-                    "with 'PaymentSubmittedDate'.");
+                    "Could not find GM expense date column: " +
+                    "ProjectMilestonePayment_PaymentSubmittedDate");
             }
+
 
             // ------------------------------------------------------------
             // Read expense rows.
