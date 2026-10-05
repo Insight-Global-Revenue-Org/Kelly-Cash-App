@@ -110,9 +110,41 @@ namespace KellyCashApp.Processors.Allegis
                 // Recover it from the configured GM Expense Report.
                 if (isExpense)
                 {
+
+                    if (expenseMatches == null)
+                    {
+                        Console.WriteLine(
+                            $"GM EXPENSE DEBUG: expenseMatches is NULL for payment row {row}");
+                    }
+                    else
+                    {
+                        Console.WriteLine(
+                            $"GM EXPENSE DEBUG: Payment row {row} | " +
+                            $"Date={lineItemEndDate:MM/dd/yyyy} | " +
+                            $"Amount={aggregateAmount:C} | " +
+                            $"Expense report rows loaded={expenseMatches.Count}");
+
+                        var amountMatches = expenseMatches
+                            .Where(x =>
+                                Math.Abs(x.Amount - aggregateAmount) <= 0.01m)
+                            .ToList();
+
+                        Console.WriteLine(
+                            $"Amount matches found: {amountMatches.Count}");
+
+                        foreach (var candidate in amountMatches.Take(10))
+                        {
+                            Console.WriteLine(
+                                $"  CSV: {candidate.ContractorName} | " +
+                                $"{candidate.Amount:C} | " +
+                                $"{candidate.Date:MM/dd/yyyy}");
+                        }
+                    }
                     GMExpenseMatch? expenseMatch = expenseMatches?
                         .Where(x =>
-                            
+                            Math.Abs(
+                                (x.Date.Date - lineItemEndDate.Date).Days) <= 1
+                            &&
                             Math.Abs(
                                 x.Amount - aggregateAmount) <= 0.01m)
                         .OrderBy(x =>
