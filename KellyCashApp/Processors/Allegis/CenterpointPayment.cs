@@ -104,32 +104,16 @@ namespace KellyCashApp.Processors.Allegis
                     vmsMatch = foundVmsRows.FirstOrDefault();
                 }
 
-                DateTime monthStart = new DateTime(
-                    lineItemEndDate.Year,
-                    lineItemEndDate.Month,
-                    1);
-
-                DateTime monthEnd = lineItemEndDate.AddDays(14);
-
-                var possibleMatches = oirRows
-                    .Where(x =>
-                        x.Name.Equals(name, StringComparison.OrdinalIgnoreCase)
-                        && x.WeekEndingDate >= monthStart
-                        && x.WeekEndingDate <= monthEnd)
-                    .OrderBy(x => x.WeekEndingDate)
-                    .ToList();
+                var matches = oirRows
+                .Where(x =>
+                    x.Name.Equals(name, StringComparison.OrdinalIgnoreCase)
+                    && Math.Abs((x.WeekEndingDate.Date - lineItemEndDate.Date).Days) <= 1)
+                .OrderBy(x =>
+                    Math.Abs((x.WeekEndingDate.Date - lineItemEndDate.Date).Days))
+                .Take(1)
+                .ToList();
 
                 bool matchedWithoutTax = false;
-
-                var matches = FindBestInvoiceCombination(possibleMatches, aggregateAmount);
-
-                if (!matches.Any() && tax != 0)
-                {
-                    matches = FindBestInvoiceCombination(possibleMatches, preTaxAggregateAmount);
-
-                    if (matches.Any())
-                        matchedWithoutTax = true;
-                }
 
                 if (matches.Any())
                 {
@@ -202,7 +186,6 @@ namespace KellyCashApp.Processors.Allegis
             string[] headers =
             {
                 "Invoice Line Item End Date",
-                "Week Ending Date",
                 "Name",
                 "Invoice",
                 "Amount Due",
@@ -228,21 +211,20 @@ namespace KellyCashApp.Processors.Allegis
                 var item = outputRows[i];
 
                 worksheet.Cell(row, 1).Value = item.InvoiceLineItemEndDate;
-                worksheet.Cell(row, 2).Value = item.WeekEndingDate;
-                worksheet.Cell(row, 3).Value = item.Name;
-                worksheet.Cell(row, 4).Value = item.Invoice;
-                worksheet.Cell(row, 5).Value = item.AmountDue;
-                worksheet.Cell(row, 6).Value = item.AggregateInvoiceLineItemAmount;
-                worksheet.Cell(row, 7).Value = item.Tax;
-                worksheet.Cell(row, 8).Value = item.Notes;
-                worksheet.Cell(row, 9).Value = item.Concat;
-                worksheet.Cell(row, 10).Value = item.CenterpointInvoice;
-                worksheet.Cell(row, 11).Value = item.VmsIdentifier;
-                worksheet.Cell(row, 12).Value = item.AggregateInvoicedNet;
-                worksheet.Cell(row, 13).Value = item.Hours;
-                worksheet.Cell(row, 14).Value = item.RtRate;
-                worksheet.Cell(row, 15).Value = item.OtRate;
-                worksheet.Cell(row, 16).Value = item.DtRate;
+                worksheet.Cell(row, 2).Value = item.Name;
+                worksheet.Cell(row, 3).Value = item.Invoice;
+                worksheet.Cell(row, 4).Value = item.AmountDue;
+                worksheet.Cell(row, 5).Value = item.AggregateInvoiceLineItemAmount;
+                worksheet.Cell(row, 6).Value = item.Tax;
+                worksheet.Cell(row, 7).Value = item.Notes;
+                worksheet.Cell(row, 8).Value = item.Concat;
+                worksheet.Cell(row, 9).Value = item.CenterpointInvoice;
+                worksheet.Cell(row, 10).Value = item.VmsIdentifier;
+                worksheet.Cell(row, 11).Value = item.AggregateInvoicedNet;
+                worksheet.Cell(row, 12).Value = item.Hours;
+                worksheet.Cell(row, 13).Value = item.RtRate;
+                worksheet.Cell(row, 14).Value = item.OtRate;
+                worksheet.Cell(row, 15).Value = item.DtRate;
 
                 worksheet.Row(row).AdjustToContents();
             }
@@ -255,19 +237,19 @@ namespace KellyCashApp.Processors.Allegis
                 if (lastOutputRow > firstOutputRow)
                 {
                     worksheet.Range(firstOutputRow, 1, lastOutputRow, 1).Merge();
+                    worksheet.Range(firstOutputRow, 5, lastOutputRow, 5).Merge();
                     worksheet.Range(firstOutputRow, 6, lastOutputRow, 6).Merge();
-                    worksheet.Range(firstOutputRow, 7, lastOutputRow, 7).Merge();
+                    worksheet.Range(firstOutputRow, 9, lastOutputRow, 9).Merge();
                     worksheet.Range(firstOutputRow, 10, lastOutputRow, 10).Merge();
                     worksheet.Range(firstOutputRow, 11, lastOutputRow, 11).Merge();
                     worksheet.Range(firstOutputRow, 12, lastOutputRow, 12).Merge();
                     worksheet.Range(firstOutputRow, 13, lastOutputRow, 13).Merge();
                     worksheet.Range(firstOutputRow, 14, lastOutputRow, 14).Merge();
                     worksheet.Range(firstOutputRow, 15, lastOutputRow, 15).Merge();
-                    worksheet.Range(firstOutputRow, 16, lastOutputRow, 16).Merge();
                 }
 
-                worksheet.Range(firstOutputRow, 1, lastOutputRow, 16)
-                    .Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                worksheet.Range(firstOutputRow, 1, lastOutputRow, 15)
+                     .Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
             }
 
             ApplyFormatting(worksheet, outputRows.Count + 1, headers.Length);
@@ -316,9 +298,33 @@ namespace KellyCashApp.Processors.Allegis
                 }
             }
 
-            return rows;
-        }
+            return rows
+            .GroupBy(x => new
+            {
+                Name = x.Name.ToUpperInvariant(),
+                x.WeekEndingDate
+            })
+            .Select(group => new OirLookupRow
+            {
+             Name = group.First().Name,
+                WeekEndingDate = group.Key.WeekEndingDate,
 
+                Invoice = string.Join(
+                    ", ",
+                    group.Select(x => x.Invoice)
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Distinct()
+                ),
+
+                AmountDue = group.Sum(x => x.AmountDue),
+
+                Concat = group.First().Concat
+            })
+            .OrderBy(x => x.Name)
+            .ThenBy(x => x.WeekEndingDate)
+            .ToList();
+                }
+    
         private static void ApplyFormatting(IXLWorksheet worksheet, int lastRow, int lastColumn)
         {
             var range = worksheet.Range(1, 1, lastRow, lastColumn);
@@ -335,9 +341,9 @@ namespace KellyCashApp.Processors.Allegis
             worksheet.Row(1).Style.Font.Bold = true;
             worksheet.Row(1).Style.Fill.BackgroundColor = XLColor.FromHtml("#FCE4D6");
 
+            worksheet.Column(4).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
             worksheet.Column(5).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
             worksheet.Column(6).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
-            worksheet.Column(7).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
 
             for (int row = 2; row <= lastRow; row++)
             {
@@ -348,39 +354,36 @@ namespace KellyCashApp.Processors.Allegis
 
             worksheet.Columns().AdjustToContents();
 
-            worksheet.Column(1).Width = 22;
-            worksheet.Column(2).Width = 16;
-            worksheet.Column(3).Width = 22;
-            worksheet.Column(4).Width = 18;
-            worksheet.Column(5).Width = 18;
-            worksheet.Column(6).Width = 28;
-            worksheet.Column(7).Width = 14;
-            worksheet.Column(8).Width = 42;
-            worksheet.Column(8).Style.Alignment.WrapText = false;
-            worksheet.Column(9).Width = 32;
-            worksheet.Column(10).Width = 20;
-            worksheet.Column(11).Width = 12;
-            worksheet.Column(12).Width = 12;
-            worksheet.Column(13).Width = 12;
-            worksheet.Column(14).Width = 12;
-            worksheet.Column(15).Width = 12;
-            worksheet.Column(16).Width = 12;
+            worksheet.Column(1).Width = 22;  // Invoice Line Item End Date
+            worksheet.Column(2).Width = 22;  // Name
+            worksheet.Column(3).Width = 18;  // Invoice
+            worksheet.Column(4).Width = 18;  // Amount Due
+            worksheet.Column(5).Width = 28;  // Aggregate Paid
+            worksheet.Column(6).Width = 14;  // Tax
+            worksheet.Column(7).Width = 42;  // Notes
+            worksheet.Column(7).Style.Alignment.WrapText = false;
+            worksheet.Column(8).Width = 32;  // Concat
+            worksheet.Column(9).Width = 20;  // Centerpoint Invoice
+            worksheet.Column(10).Width = 12; // VMS Identifier
+            worksheet.Column(11).Width = 12; // Invoiced Net
+            worksheet.Column(12).Width = 12; // Hours
+            worksheet.Column(13).Width = 12; // RT Rate
+            worksheet.Column(14).Width = 12; // OT Rate
+            worksheet.Column(15).Width = 12; // DT Rate;
 
-            worksheet.Column(12).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
-            worksheet.Column(13).Style.NumberFormat.Format = "0.00";
+            worksheet.Column(11).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
+            worksheet.Column(12).Style.NumberFormat.Format = "0.00";
+            worksheet.Column(13).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
             worksheet.Column(14).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
             worksheet.Column(15).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
-            worksheet.Column(16).Style.NumberFormat.Format = "$#,##0.00;($#,##0.00)";
 
             for (int row = 2; row <= lastRow; row++)
             {
-                decimal amountDue = GetDecimalValue(worksheet.Cell(row, 5));
+                decimal amountDue = GetDecimalValue(worksheet.Cell(row, 4));
 
                 if (amountDue <= 0)
                 {
-                    worksheet.Cell(row, 5).Style.Font.FontColor = XLColor.Red;
-
-                    worksheet.Range(row, 1, row, 16)
+                    worksheet.Range(row, 1, row, 15)
                         .Style.Fill.BackgroundColor = XLColor.FromHtml("#F2F2F2");
                 }
             }
