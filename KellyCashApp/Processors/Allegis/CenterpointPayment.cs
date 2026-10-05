@@ -58,8 +58,6 @@ namespace KellyCashApp.Processors.Allegis
 
             var outputRows = new List<CenterpointOutputRow>();
 
-            int groupId = 0;
-
             var nameChanges = Rename.LoadNameChanges();
 
             for (int row = FirstDataRow; row <= lastRow; row++)
@@ -76,7 +74,6 @@ namespace KellyCashApp.Processors.Allegis
                 if (lineItemEndDate == DateTime.MinValue)
                     continue;
 
-                groupId++;
                 string formattedLineItemEndDate = lineItemEndDate.ToString("MM/dd/yyyy");
 
 
@@ -104,68 +101,128 @@ namespace KellyCashApp.Processors.Allegis
                     vmsMatch = foundVmsRows.FirstOrDefault();
                 }
 
-                var matches = oirRows
-                .Where(x =>
-                    x.Name.Equals(name, StringComparison.OrdinalIgnoreCase)
-                    && Math.Abs((x.WeekEndingDate.Date - lineItemEndDate.Date).Days) <= 1)
-                .OrderBy(x =>
-                    Math.Abs((x.WeekEndingDate.Date - lineItemEndDate.Date).Days))
-                .Take(1)
-                .ToList();
-
-                bool matchedWithoutTax = false;
-
-                if (matches.Any())
+                outputRows.Add(new CenterpointOutputRow
                 {
-                    foreach (var match in matches)
-                    {
-                        outputRows.Add(new CenterpointOutputRow
-                        {
-                            WeekEndingDate = match.WeekEndingDate.ToString("MM/dd/yyyy"),
-                            Name = name,
-                            Invoice = match.Invoice,
-                            AmountDue = match.AmountDue,
-                            InvoiceLineItemEndDate = formattedLineItemEndDate,
-                            AggregateInvoiceLineItemAmount = aggregateAmount,
-                            Tax = tax,
-                            Notes = matchedWithoutTax
-                                ? "Sales Tax was not included in Amount Due!"
-                                : "",
-                            GroupId = groupId,
-                            Concat = $"{name} {formattedLineItemEndDate}",
-                            CenterpointInvoice = centerpointInvoice,
-                            VmsIdentifier = vmsIdentifier,
-                            AggregateInvoicedNet = vmsMatch?.AggregateInvoicedNet ?? 0,
-                            Hours = vmsMatch?.Hours ?? 0,
-                            RtRate = vmsMatch?.RtRate ?? 0,
-                            OtRate = vmsMatch?.OtRate ?? 0,
-                            DtRate = vmsMatch?.DtRate ?? 0
-                        });
-                    }
-                }
-                else
+                    WeekEndingDate = formattedLineItemEndDate,
+                    Name = name,
+
+                    Invoice = "",
+                    AmountDue = 0,
+
+                    InvoiceLineItemEndDate = formattedLineItemEndDate,
+                    AggregateInvoiceLineItemAmount = aggregateAmount,
+                    Tax = tax,
+
+                    Notes = "",
+
+                    Concat = $"{name} {formattedLineItemEndDate}",
+
+                    CenterpointInvoice = centerpointInvoice,
+                    VmsIdentifier = vmsIdentifier,
+
+                    AggregateInvoicedNet = vmsMatch?.AggregateInvoicedNet ?? 0,
+                    Hours = vmsMatch?.Hours ?? 0,
+                    RtRate = vmsMatch?.RtRate ?? 0,
+                    OtRate = vmsMatch?.OtRate ?? 0,
+                    DtRate = vmsMatch?.DtRate ?? 0
+                });
+
+            }
+
+            outputRows = outputRows
+    .GroupBy(x => new
+    {
+        Name = x.Name.ToUpperInvariant(),
+        x.WeekEndingDate
+    })
+    .Select(group =>
+    {
+        var first = group.First();
+
+        return new CenterpointOutputRow
+        {
+            WeekEndingDate = first.WeekEndingDate,
+            Name = first.Name,
+
+            Invoice = "",
+            AmountDue = 0,
+
+            InvoiceLineItemEndDate = first.InvoiceLineItemEndDate,
+
+            AggregateInvoiceLineItemAmount =
+                group.Sum(x => x.AggregateInvoiceLineItemAmount),
+
+            Tax = group.Sum(x => x.Tax),
+
+            Notes = "",
+
+            Concat =
+                $"{first.Name} {first.WeekEndingDate}",
+
+            CenterpointInvoice = string.Join(
+                ", ",
+                group.Select(x => x.CenterpointInvoice)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)),
+
+            VmsIdentifier = first.VmsIdentifier,
+
+            AggregateInvoicedNet =
+                group.Sum(x => x.AggregateInvoicedNet),
+
+            Hours =
+                group.Sum(x => x.Hours),
+
+            RtRate = first.RtRate,
+            OtRate = first.OtRate,
+            DtRate = first.DtRate
+        };
+    })
+    .ToList();
+
+            var matchedInvoiceNumbers =
+    new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var outputRow in outputRows)
+            {
+                if (!DateTime.TryParse(
+                    outputRow.WeekEndingDate,
+                    out DateTime centerpointDate))
                 {
-                    outputRows.Add(new CenterpointOutputRow
-                    {
-                        WeekEndingDate = "",
-                        Name = name,
-                        Invoice = "",
-                        AmountDue = 0,
-                        InvoiceLineItemEndDate = formattedLineItemEndDate,
-                        AggregateInvoiceLineItemAmount = aggregateAmount,
-                        Tax = tax,
-                        Notes = "",
-                        GroupId = groupId,
-                        Concat = $"{name} {formattedLineItemEndDate}",
-                        CenterpointInvoice = centerpointInvoice,
-                        VmsIdentifier = vmsIdentifier,
-                        AggregateInvoicedNet = vmsMatch?.AggregateInvoicedNet ?? 0,
-                        Hours = vmsMatch?.Hours ?? 0,
-                        RtRate = vmsMatch?.RtRate ?? 0,
-                        OtRate = vmsMatch?.OtRate ?? 0,
-                        DtRate = vmsMatch?.DtRate ?? 0
-                    });
+                    continue;
                 }
+
+                var match = oirRows
+                    .Where(x =>
+                        x.Name.Equals(
+                            outputRow.Name,
+                            StringComparison.OrdinalIgnoreCase)
+
+                        && Math.Abs(
+                            (x.WeekEndingDate.Date - centerpointDate.Date).Days) <= 2
+
+                        && !string.IsNullOrWhiteSpace(x.Invoice)
+
+                        && !matchedInvoiceNumbers.Contains(x.Invoice))
+                    .OrderBy(x =>
+                        Math.Abs(
+                            (x.WeekEndingDate.Date - centerpointDate.Date).Days))
+                    .ThenBy(x =>
+                        Math.Abs(
+                            x.AmountDue -
+                            outputRow.AggregateInvoiceLineItemAmount))
+                    .FirstOrDefault();
+
+                if (match == null)
+                    continue;
+
+                outputRow.Invoice = match.Invoice;
+                outputRow.AmountDue = match.AmountDue;
+
+                outputRow.Concat =
+                    $"{outputRow.Name} {match.WeekEndingDate:MM/dd/yyyy}";
+
+                matchedInvoiceNumbers.Add(match.Invoice);
             }
 
             decimal total = 0;
@@ -229,29 +286,6 @@ namespace KellyCashApp.Processors.Allegis
                 worksheet.Row(row).AdjustToContents();
             }
 
-            foreach (var group in outputRows.GroupBy(x => x.GroupId))
-            {
-                int firstOutputRow = outputRows.IndexOf(group.First()) + 2;
-                int lastOutputRow = outputRows.IndexOf(group.Last()) + 2;
-
-                if (lastOutputRow > firstOutputRow)
-                {
-                    worksheet.Range(firstOutputRow, 1, lastOutputRow, 1).Merge();
-                    worksheet.Range(firstOutputRow, 5, lastOutputRow, 5).Merge();
-                    worksheet.Range(firstOutputRow, 6, lastOutputRow, 6).Merge();
-                    worksheet.Range(firstOutputRow, 9, lastOutputRow, 9).Merge();
-                    worksheet.Range(firstOutputRow, 10, lastOutputRow, 10).Merge();
-                    worksheet.Range(firstOutputRow, 11, lastOutputRow, 11).Merge();
-                    worksheet.Range(firstOutputRow, 12, lastOutputRow, 12).Merge();
-                    worksheet.Range(firstOutputRow, 13, lastOutputRow, 13).Merge();
-                    worksheet.Range(firstOutputRow, 14, lastOutputRow, 14).Merge();
-                    worksheet.Range(firstOutputRow, 15, lastOutputRow, 15).Merge();
-                }
-
-                worksheet.Range(firstOutputRow, 1, lastOutputRow, 15)
-                     .Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-            }
-
             ApplyFormatting(worksheet, outputRows.Count + 1, headers.Length);
 
             string downloadsPath = Settings.GetRemittanceSavePath();
@@ -298,32 +332,8 @@ namespace KellyCashApp.Processors.Allegis
                 }
             }
 
-            return rows
-            .GroupBy(x => new
-            {
-                Name = x.Name.ToUpperInvariant(),
-                x.WeekEndingDate
-            })
-            .Select(group => new OirLookupRow
-            {
-             Name = group.First().Name,
-                WeekEndingDate = group.Key.WeekEndingDate,
-
-                Invoice = string.Join(
-                    ", ",
-                    group.Select(x => x.Invoice)
-                        .Where(x => !string.IsNullOrWhiteSpace(x))
-                        .Distinct()
-                ),
-
-                AmountDue = group.Sum(x => x.AmountDue),
-
-                Concat = group.First().Concat
-            })
-            .OrderBy(x => x.Name)
-            .ThenBy(x => x.WeekEndingDate)
-            .ToList();
-                }
+            return rows;
+        }
     
         private static void ApplyFormatting(IXLWorksheet worksheet, int lastRow, int lastColumn)
         {
@@ -528,7 +538,6 @@ namespace KellyCashApp.Processors.Allegis
             public decimal Tax { get; set; }
             public string Notes { get; set; } = "";
             public string InvoiceLineItemEndDate { get; set; } = "";
-            public int GroupId { get; set; }
             public string Concat { get; set; } = "";
             public string CenterpointInvoice { get; set; } = "";
             public string VmsIdentifier { get; set; } = "";
