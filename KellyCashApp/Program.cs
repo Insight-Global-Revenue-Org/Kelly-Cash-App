@@ -479,6 +479,67 @@ while (true)
             continue;
         }
 
+        // Conditional check for SAIC payments
+        if (SAICPayment.IsSAICFormat(worksheet))
+        {
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            loading = true;
+
+            spinner = Task.Run(() =>
+            {
+                char[] frames = { '/', '-', '\\', '|' };
+                int i = 0;
+
+                while (loading)
+                {
+                    Console.SetCursorPosition(
+                        0,
+                        promptTop);
+
+                    Console.Write(
+                        $"Processing SAIC payment file... " +
+                        $"{frames[i++ % frames.Length]}   ");
+
+                    Thread.Sleep(120);
+                }
+            });
+
+            string saicOutputPath =
+                SAICPayment.Process(
+                    workbook,
+                    worksheet,
+                    inputPath,
+                    openInvoiceMatchesMultiple
+                );
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine(
+                "SAIC payment processed successfully.");
+
+            Console.WriteLine(
+                $"Updated file saved to: {saicOutputPath}");
+
+            Console.WriteLine();
+
+            Console.WriteLine(
+                "Press any key to return to the menu...");
+
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
         // -------- Main Conditional loop for all Allegis Payments! --------
         // Conditional check for Microsoft payments (Re-Routing)
         if (MicrosoftPayment.IsMicrosoftFormat(worksheet))
