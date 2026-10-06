@@ -343,10 +343,20 @@ namespace KellyCashApp.Processors.Allegis
 
                         && !string.IsNullOrWhiteSpace(x.Invoice)
 
-                        && !matchedInvoiceNumbers.Contains(x.Invoice))
+                        && !matchedInvoiceNumbers.Contains(x.Invoice)
+
+                        // Expense rows MUST match the OIR remaining amount exactly.
+                        && (
+                            !outputRow.Type.Equals(
+                                "Expense",
+                                StringComparison.OrdinalIgnoreCase)
+                            ||
+                            x.AmountDue ==
+                                outputRow.AggregateInvoiceLineItemAmount
+                        ))
                     .OrderBy(x =>
                         Math.Abs(
-                            (x.WeekEndingDate.Date - centerpointDate.Date).Days))
+                             (x.WeekEndingDate.Date - centerpointDate.Date).Days))
                     .ThenBy(x =>
                         Math.Abs(
                             x.AmountDue -

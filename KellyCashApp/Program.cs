@@ -463,12 +463,25 @@ while (true)
                 }
             });
 
+            List<SAPSAICTimesheetMatch>? saicTimesheetMatches = null;
+
+            string saicTimesheetPath =
+                Settings.GetSAICTimesheetReportFilePath();
+
+            if (!string.IsNullOrWhiteSpace(saicTimesheetPath))
+            {
+                saicTimesheetMatches =
+                    SAPSAICTimesheet.Import(
+                        saicTimesheetPath);
+            }
+
             string saicOutputPath =
                 SAICPayment.Process(
                     workbook,
                     worksheet,
                     inputPath,
-                    openInvoiceMatchesMultiple
+                    openInvoiceMatchesMultiple,
+                    saicTimesheetMatches
                 );
 
             loading = false;
@@ -615,12 +628,26 @@ while (true)
                 }
             });
 
-            string sapOutputPath = SAPPayment.Process(
-                workbook,
-                worksheet,
-                inputPath,
-                openInvoiceMatchesMultiple
-            );
+            List<SAPSAICTimesheetMatch>? sapTimesheetMatches = null;
+
+            string sapTimesheetPath =
+                Settings.GetSAPTimesheetReportFilePath();
+
+            if (!string.IsNullOrWhiteSpace(sapTimesheetPath))
+            {
+                sapTimesheetMatches =
+                    SAPSAICTimesheet.Import(
+                        sapTimesheetPath);
+            }
+
+            string sapOutputPath =
+                SAPPayment.Process(
+                    workbook,
+                    worksheet,
+                    inputPath,
+                    openInvoiceMatchesMultiple,
+                    sapTimesheetMatches
+                );
 
             loading = false;
             spinner.Wait();
