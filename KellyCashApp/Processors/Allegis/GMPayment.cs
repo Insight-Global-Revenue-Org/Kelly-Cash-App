@@ -48,7 +48,7 @@ namespace KellyCashApp.Processors.Allegis
             string inputPath,
             Dictionary<string, List<OirMatch>> openInvoiceMatches,
                 List<GMExpenseMatch>? expenseMatches = null,
-            Dictionary<string, List<GMVmsMatch>>? vmsMatches = null)
+            List<AllegisTimesheetMatch>? timesheetMatches = null)
         {
             int gmInvoiceCol =
                 FindColumn(
@@ -134,16 +134,15 @@ namespace KellyCashApp.Processors.Allegis
                 if (isExpense)
                 {
                     GMExpenseMatch? expenseMatch = expenseMatches?
-                        .Where(x =>
-                            Math.Abs(
-                                (x.Date.Date - lineItemEndDate.Date).Days) <= 1
-                            &&
-                            Math.Abs(
-                                x.Amount - aggregateAmount) <= 0.01m)
-                        .OrderBy(x =>
-                            Math.Abs(
-                                (x.Date.Date - lineItemEndDate.Date).Days))
-                        .FirstOrDefault();
+                    .Where(x =>
+                        Math.Abs(
+                            (x.Date.Date - lineItemEndDate.Date).Days) <= 14
+                        &&
+                        x.Amount == aggregateAmount)
+                    .OrderBy(x =>
+                        Math.Abs(
+                            (x.Date.Date - lineItemEndDate.Date).Days))
+                    .FirstOrDefault();
 
                     if (expenseMatch != null)
                     {
@@ -208,15 +207,19 @@ namespace KellyCashApp.Processors.Allegis
                 if (vmsIdentifier.Length > 5)
                     vmsIdentifier = vmsIdentifier[^5..];
 
-                string vmsLookupKey = $"{name}|{vmsIdentifier}";
-
-                GMVmsMatch? vmsMatch = null;
-
-                if (vmsMatches != null &&
-                    vmsMatches.TryGetValue(vmsLookupKey, out var foundVmsRows))
-                {
-                    vmsMatch = foundVmsRows.FirstOrDefault();
-                }
+                AllegisTimesheetMatch? timesheetMatch =
+                    timesheetMatches?
+                        .Where(x =>
+                            x.ContractorName.Equals(
+                 name,
+                 StringComparison.OrdinalIgnoreCase)
+             &&
+             Math.Abs(
+                 (x.WeekEndingDate.Date - lineItemEndDate.Date).Days) <= 1)
+                .OrderBy(x =>
+             Math.Abs(
+                 (x.WeekEndingDate.Date - lineItemEndDate.Date).Days))
+                    .FirstOrDefault();
 
                 outputRows.Add(new GMOutputRow
                 {
@@ -242,11 +245,20 @@ namespace KellyCashApp.Processors.Allegis
 
                     AggregationKey = aggregationKey,
 
-                    AggregateInvoicedNet = vmsMatch?.AggregateInvoicedNet ?? 0,
-                    Hours = vmsMatch?.Hours ?? 0,
-                    RtRate = vmsMatch?.RtRate ?? 0,
-                    OtRate = vmsMatch?.OtRate ?? 0,
-                    DtRate = vmsMatch?.DtRate ?? 0
+                    AggregateInvoicedNet =
+                    timesheetMatch?.AggregateInvoicedNet ?? 0,
+
+                    Hours =
+                    timesheetMatch?.Hours ?? 0,
+
+                    RtRate =
+                    timesheetMatch?.RtRate ?? 0,
+
+                    OtRate =
+                    timesheetMatch?.OtRate ?? 0,
+
+                    DtRate =
+                    timesheetMatch?.DtRate ?? 0
                 });
 
             }
@@ -327,7 +339,7 @@ namespace KellyCashApp.Processors.Allegis
                             StringComparison.OrdinalIgnoreCase)
 
                         && Math.Abs(
-                            (x.WeekEndingDate.Date - centerpointDate.Date).Days) <= 2
+                            (x.WeekEndingDate.Date - centerpointDate.Date).Days) <= 1
 
                         && !string.IsNullOrWhiteSpace(x.Invoice)
 

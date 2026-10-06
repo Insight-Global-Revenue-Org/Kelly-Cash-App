@@ -10,18 +10,22 @@
 
         private static string OirSavePathFile =>
             Path.Combine(SettingsFolder, "oir-save-path.txt");
-
         private static string UacSavePathFile =>
             Path.Combine(SettingsFolder, "uac-save-path.txt");
-
         private static string RemittanceSavePathFile =>
             Path.Combine(SettingsFolder, "remittance-save-path.txt");
-
         private static string NameChangeFilePathFile =>
             Path.Combine(SettingsFolder, "name-change-file-path.txt");
-
         private static string GMExpenseReportFilePathFile =>
-    Path.Combine(SettingsFolder, "gm-expense-report-file-path.txt");
+            Path.Combine(SettingsFolder, "gm-expense-report-file-path.txt");
+        private static string GMTimesheetReportFilePathFile =>
+            Path.Combine(SettingsFolder, "gm-timesheet-report-file-path.txt");
+        private static string SAPTimesheetReportFilePathFile =>
+            Path.Combine(SettingsFolder, "sap-timesheet-report-file-path.txt");
+        private static string SAICTimesheetReportFilePathFile =>
+            Path.Combine(SettingsFolder, "saic-timesheet-report-file-path.txt");
+        private static string CenterpointTimesheetReportFilePathFile =>
+            Path.Combine(SettingsFolder, "centerpoint-timesheet-report-file-path.txt");
         private static string MicrosoftVmsReportFilePathFile =>
             Path.Combine(SettingsFolder, "microsoft-vms-report-file-path.txt");
         private static string JohnsonJohnsonVmsReportFilePathFile =>
@@ -150,6 +154,39 @@
             return "";
         }
 
+        public static string GetGMTimesheetReportFilePath()
+        {
+            return GetExistingFilePath(GMTimesheetReportFilePathFile);
+        }
+
+        public static string GetSAPTimesheetReportFilePath()
+        {
+            return GetExistingFilePath(SAPTimesheetReportFilePathFile);
+        }
+
+        public static string GetSAICTimesheetReportFilePath()
+        {
+            return GetExistingFilePath(SAICTimesheetReportFilePathFile);
+        }
+
+        public static string GetCenterpointTimesheetReportFilePath()
+        {
+            return GetExistingFilePath(CenterpointTimesheetReportFilePathFile);
+        }
+
+        private static string GetExistingFilePath(string settingsFile)
+        {
+            if (File.Exists(settingsFile))
+            {
+                string savedPath = File.ReadAllText(settingsFile).Trim();
+
+                if (File.Exists(savedPath))
+                    return savedPath;
+            }
+
+            return "";
+        }
+
         public static string GetGMExpenseReportFilePath()
         {
             if (File.Exists(GMExpenseReportFilePathFile))
@@ -245,6 +282,10 @@
                 int selected = ShowMenu(new[]
                 {
                     "GM Expense Report File Path",
+                    "GM Timesheet Report File Path",
+                    "SAP Timesheet Report File Path",
+                    "SAIC Timesheet Report File Path",
+                    "Centerpoint Timesheet Report File Path",
                     "Microsoft VMS Report File Path",
                     "Johnson & Johnson VMS Report File Path",
                     "Kenvue VMS Report File Path",
@@ -253,7 +294,7 @@
                     "Back"
                 }, 0, menuTop);
 
-                if (selected == 6)
+                if (selected == 10)
                     return;
 
                 ConsoleUi.ResetPage(menuTop);
@@ -263,54 +304,79 @@
                     SaveFilePathSetting(
                         "Paste the full CSV file path for the GM Expense Report:",
                         GMExpenseReportFilePathFile,
-                        menuTop
-                    );
+                        menuTop);
                 }
 
                 if (selected == 1)
                 {
                     SaveFilePathSetting(
-                        "Paste the full Excel file path for the Microsoft VMS Report:",
-                        MicrosoftVmsReportFilePathFile,
-                        menuTop
-                    );
+                        "Paste the full Excel file path for the GM Timesheet Report:",
+                        GMTimesheetReportFilePathFile,
+                        menuTop);
                 }
 
                 if (selected == 2)
                 {
                     SaveFilePathSetting(
-                        "Paste the full Excel file path for the Johnson & Johnson VMS Report:",
-                        JohnsonJohnsonVmsReportFilePathFile,
-                        menuTop
-                    );
+                        "Paste the full Excel file path for the SAP Timesheet Report:",
+                        SAPTimesheetReportFilePathFile,
+                        menuTop);
                 }
 
                 if (selected == 3)
                 {
                     SaveFilePathSetting(
-                        "Paste the full Excel file path for the Kenvue VMS Report:",
-                        KenvueVmsReportFilePathFile,
-                        menuTop
-                    );
+                        "Paste the full Excel file path for the SAIC Timesheet Report:",
+                        SAICTimesheetReportFilePathFile,
+                        menuTop);
                 }
-
 
                 if (selected == 4)
                 {
                     SaveFilePathSetting(
-                        "Paste the full Excel file path for the Nike Tracker Board:",
-                        NikeTrackerBoardFilePathFile,
-                        menuTop
-                    );
+                        "Paste the full Excel file path for the Centerpoint Timesheet Report:",
+                        CenterpointTimesheetReportFilePathFile,
+                        menuTop);
                 }
 
                 if (selected == 5)
                 {
                     SaveFilePathSetting(
+                        "Paste the full Excel file path for the Microsoft VMS Report:",
+                        MicrosoftVmsReportFilePathFile,
+                        menuTop);
+                }
+
+                if (selected == 6)
+                {
+                    SaveFilePathSetting(
+                        "Paste the full Excel file path for the Johnson & Johnson VMS Report:",
+                        JohnsonJohnsonVmsReportFilePathFile,
+                        menuTop);
+                }
+
+                if (selected == 7)
+                {
+                    SaveFilePathSetting(
+                        "Paste the full Excel file path for the Kenvue VMS Report:",
+                        KenvueVmsReportFilePathFile,
+                        menuTop);
+                }
+
+                if (selected == 8)
+                {
+                    SaveFilePathSetting(
+                        "Paste the full Excel file path for the Nike Tracker Board:",
+                        NikeTrackerBoardFilePathFile,
+                        menuTop);
+                }
+
+                if (selected == 9)
+                {
+                    SaveFilePathSetting(
                         "Paste the full Excel file path for the Experis End Client Mapping File:",
                         ExperisEndClientMappingFilePathFile,
-                        menuTop
-                    );
+                        menuTop);
                 }
 
                 ClearArea(menuTop, 12);

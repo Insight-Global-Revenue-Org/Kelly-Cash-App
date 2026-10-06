@@ -205,7 +205,7 @@ namespace KellyCashApp.Processors.Allegis
                             StringComparison.OrdinalIgnoreCase)
 
                         && Math.Abs(
-                            (x.WeekEndingDate.Date - centerpointDate.Date).Days) <= 2
+                            (x.WeekEndingDate.Date - centerpointDate.Date).Days) <= 1
 
                         && !string.IsNullOrWhiteSpace(x.Invoice)
 

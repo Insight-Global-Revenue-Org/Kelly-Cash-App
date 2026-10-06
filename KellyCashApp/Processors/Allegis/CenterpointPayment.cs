@@ -41,7 +41,7 @@ namespace KellyCashApp.Processors.Allegis
             IXLWorksheet worksheet,
             string inputPath,
             Dictionary<string, List<OirMatch>> openInvoiceMatches,
-            Dictionary<string, List<CenterpointVmsMatch>>? vmsMatches = null)
+            List<AllegisTimesheetMatch>? timesheetMatches = null)
         {
             int centerpointInvoiceCol = FindColumn(worksheet, HeaderRow, "Consolidated Invoice ID");
             int workerCol = FindColumn(worksheet, HeaderRow, "Worker");
@@ -91,15 +91,19 @@ namespace KellyCashApp.Processors.Allegis
                 if (vmsIdentifier.Length > 5)
                     vmsIdentifier = vmsIdentifier[^5..];
 
-                string vmsLookupKey = $"{name}|{vmsIdentifier}";
-
-                CenterpointVmsMatch? vmsMatch = null;
-
-                if (vmsMatches != null &&
-                    vmsMatches.TryGetValue(vmsLookupKey, out var foundVmsRows))
-                {
-                    vmsMatch = foundVmsRows.FirstOrDefault();
-                }
+                AllegisTimesheetMatch? timesheetMatch =
+            timesheetMatches?
+                .Where(x =>
+            x.ContractorName.Equals(
+                name,
+                StringComparison.OrdinalIgnoreCase)
+            &&
+            Math.Abs(
+                (x.WeekEndingDate.Date - lineItemEndDate.Date).Days) <= 1)
+                .OrderBy(x =>
+            Math.Abs(
+                (x.WeekEndingDate.Date - lineItemEndDate.Date).Days))
+                .FirstOrDefault();
 
                 outputRows.Add(new CenterpointOutputRow
                 {
@@ -120,11 +124,20 @@ namespace KellyCashApp.Processors.Allegis
                     CenterpointInvoice = centerpointInvoice,
                     VmsIdentifier = vmsIdentifier,
 
-                    AggregateInvoicedNet = vmsMatch?.AggregateInvoicedNet ?? 0,
-                    Hours = vmsMatch?.Hours ?? 0,
-                    RtRate = vmsMatch?.RtRate ?? 0,
-                    OtRate = vmsMatch?.OtRate ?? 0,
-                    DtRate = vmsMatch?.DtRate ?? 0
+                    AggregateInvoicedNet =
+                    timesheetMatch?.AggregateInvoicedNet ?? 0,
+
+                    Hours =
+                    timesheetMatch?.Hours ?? 0,
+
+                    RtRate =
+                    timesheetMatch?.RtRate ?? 0,
+
+                    OtRate =
+                    timesheetMatch?.OtRate ?? 0,
+
+                    DtRate =
+                    timesheetMatch?.DtRate ?? 0
                 });
 
             }
@@ -199,7 +212,7 @@ namespace KellyCashApp.Processors.Allegis
                             StringComparison.OrdinalIgnoreCase)
 
                         && Math.Abs(
-                            (x.WeekEndingDate.Date - centerpointDate.Date).Days) <= 2
+                            (x.WeekEndingDate.Date - centerpointDate.Date).Days) <= 1
 
                         && !string.IsNullOrWhiteSpace(x.Invoice)
 

@@ -398,11 +398,23 @@ while (true)
                 }
             });
 
+            List<AllegisTimesheetMatch>? centerpointTimesheetMatches = null;
+
+            string centerpointTimesheetPath =
+                Settings.GetCenterpointTimesheetReportFilePath();
+
+            if (!string.IsNullOrWhiteSpace(centerpointTimesheetPath))
+            {
+                centerpointTimesheetMatches =
+                    AllegisTimesheet.Import(centerpointTimesheetPath);
+            }
+
             string centerpointOutputPath = CenterpointPayment.Process(
-                workbook,
-                worksheet,
-                inputPath,
-                openInvoiceMatchesMultiple
+            workbook,
+            worksheet,
+            inputPath,
+            openInvoiceMatchesMultiple,
+            centerpointTimesheetMatches
             );
 
             loading = false;
@@ -507,6 +519,17 @@ while (true)
             List<GMExpenseMatch> gmExpenseMatches =
                 GMExpense.Import(gmExpensePath);
 
+            List<AllegisTimesheetMatch>? gmTimesheetMatches = null;
+
+            string gmTimesheetPath =
+                Settings.GetGMTimesheetReportFilePath();
+
+            if (!string.IsNullOrWhiteSpace(gmTimesheetPath))
+            {
+                gmTimesheetMatches =
+                    AllegisTimesheet.Import(gmTimesheetPath);
+            }
+
             // ---------------------------------------------------------
             // Start GM payment spinner
             // ---------------------------------------------------------
@@ -533,12 +556,13 @@ while (true)
             // Pass expense matches into GMPayment.Process
             // ---------------------------------------------------------
             string gmOutputPath = GMPayment.Process(
-                workbook,
-                worksheet,
-                inputPath,
-                openInvoiceMatchesMultiple,
-                gmExpenseMatches
-            );
+                    workbook,
+                    worksheet,
+                    inputPath,
+                    openInvoiceMatchesMultiple,
+                    gmExpenseMatches,
+                    gmTimesheetMatches
+                );
 
             loading = false;
             spinner.Wait();
