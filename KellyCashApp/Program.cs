@@ -433,6 +433,80 @@ while (true)
             continue;
         }
 
+        // Example check for SAIC payments
+        if (Example.IsExampleFormat(worksheet))
+        {
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            loading = true;
+
+            spinner = Task.Run(() =>
+            {
+                char[] frames = { '/', '-', '\\', '|' };
+                int i = 0;
+
+                while (loading)
+                {
+                    Console.SetCursorPosition(
+                        0,
+                        promptTop);
+
+                    Console.Write(
+                        $"Processing SAIC payment file... " +
+                        $"{frames[i++ % frames.Length]}   ");
+
+                    Thread.Sleep(120);
+                }
+            });
+
+            List<SAPSAICTimesheetMatch>? saicTimesheetMatches = null;
+
+            string saicTimesheetPath =
+                Settings.GetSAICTimesheetReportFilePath();
+
+            if (!string.IsNullOrWhiteSpace(saicTimesheetPath))
+            {
+                saicTimesheetMatches =
+                    SAPSAICTimesheet.Import(
+                        saicTimesheetPath);
+            }
+
+            string saicOutputPath =
+                SAICPayment.Process(
+                    workbook,
+                    worksheet,
+                    inputPath,
+                    openInvoiceMatchesMultiple,
+                    saicTimesheetMatches
+                );
+
+            loading = false;
+            spinner.Wait();
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine(
+                "SAIC payment processed successfully.");
+
+            Console.WriteLine(
+                $"Updated file saved to: {saicOutputPath}");
+
+            Console.WriteLine();
+
+            Console.WriteLine(
+                "Press any key to return to the menu...");
+
+            Console.ReadKey(true);
+
+            defaultMenuOption = 1;
+            continue;
+        }
+
         // Conditional check for SAIC payments
         if (SAICPayment.IsSAICFormat(worksheet))
         {
