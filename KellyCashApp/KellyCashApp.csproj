@@ -11,6 +11,8 @@
 	<ItemGroup>
 		<PackageReference Include="ClosedXML" Version="0.105.0" />
 		<PackageReference Include="DocumentFormat.OpenXml.STW" Version="2.5.5631" />
+		<PackageReference Include="HtmlAgilityPack" Version="1.13.0" />
+		<PackageReference Include="MimeKit" Version="4.18.0" />
 		<PackageReference Include="PdfPig" Version="0.1.14" />
 	</ItemGroup>
 
