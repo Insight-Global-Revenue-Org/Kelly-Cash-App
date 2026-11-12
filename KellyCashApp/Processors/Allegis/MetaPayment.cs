@@ -161,18 +161,42 @@ namespace KellyCashApp.Processors.Allegis
             // AGGREGATE PAYMENTS BY CONTRACTOR AND WEEK ENDING
             // ============================================================
 
+
             outputRows = outputRows
                 .GroupBy(x => new
                 {
-
                     Key = string.IsNullOrWhiteSpace(x.Name)
-                    ? $"UNMATCHED:{x.MetaInvoice.ToUpperInvariant()}"
-                    : $"{x.Name.ToUpperInvariant()}|{x.WeekEndingDate}|{x.ItemType}"
-
+                        ? $"UNMATCHED:{x.MetaInvoice.ToUpperInvariant()}|{x.ItemType}"
+                        : $"{x.Name.ToUpperInvariant()}|{x.WeekEndingDate}|{x.ItemType}"
                 })
                 .Select(group =>
                 {
                     var first = group.First();
+
+                    decimal aggregatePaid =
+                        group.Sum(x => x.AggregateAmountPaid);
+
+                    // Look up each distinct Meta invoice only once,
+                    // even if the CSV contains multiple payment lines.
+                    var registerRows = group
+                        .Select(x => x.MetaInvoice)
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .Where(invoice => registerMatches.ContainsKey(invoice))
+                        .Select(invoice => registerMatches[invoice])
+                        .ToList();
+
+                    decimal rtUnits = registerRows.Sum(x => x.RTUnits);
+                    decimal otUnits = registerRows.Sum(x => x.OTUnits);
+                    decimal dtUnits = registerRows.Sum(x => x.DTUnits);
+
+                    decimal rtBillAmount =
+                        registerRows.Sum(x => x.RTBillAmount);
+
+                    decimal otBillAmount =
+                        registerRows.Sum(x => x.OTBillAmount);
+
+                    decimal dtBillAmount =
+                        registerRows.Sum(x => x.DTBillAmount);
 
                     return new MetaOutputRow
                     {
@@ -181,16 +205,42 @@ namespace KellyCashApp.Processors.Allegis
                         Invoice = "",
                         AmountDue = 0,
 
-                        AggregateAmountPaid =
-                            group.Sum(x => x.AggregateAmountPaid),
-
+                        AggregateAmountPaid = aggregatePaid,
                         ItemType = first.ItemType,
+
+                        Notes = aggregatePaid < 0
+                            ? "credit has been applied to payment"
+                            : "",
+
                         Concat = first.Concat,
 
                         MetaInvoice = string.Join(", ",
                             group.Select(x => x.MetaInvoice)
-                                .Distinct(
-                                    StringComparer.OrdinalIgnoreCase))
+                                .Distinct(StringComparer.OrdinalIgnoreCase)),
+
+                        RTUnits = rtUnits,
+                        RTBillRate = rtUnits != 0
+                            ? rtBillAmount / rtUnits
+                            : 0,
+
+                        OTUnits = otUnits,
+                        OTBillRate = otUnits != 0
+                            ? otBillAmount / otUnits
+                            : 0,
+
+                        DTUnits = dtUnits,
+                        DTBillRate = dtUnits != 0
+                            ? dtBillAmount / dtUnits
+                            : 0,
+
+                        NetMSPFee =
+                            registerRows.Sum(x => x.NetMSPFee),
+
+                        NetSalesTax =
+                            registerRows.Sum(x => x.NetSalesTax),
+
+                        NetTotal =
+                            registerRows.Sum(x => x.NetTotal)
                     };
                 })
                 .ToList();
@@ -262,6 +312,7 @@ namespace KellyCashApp.Processors.Allegis
 
             var worksheet = workbook.AddWorksheet("Reconciliation Notes");
 
+
             string[] headers =
             {
                 "Week Ending Date",
@@ -270,9 +321,20 @@ namespace KellyCashApp.Processors.Allegis
                 "Amount Due",
                 "Aggregate Amount Paid",
                 "Item Type",
+                "Notes",
                 "Concat",
-                "Meta Invoice"
+                "Meta Invoice",
+                "RT Units",
+                "RT Bill Rate",
+                "OT Units",
+                "OT Bill Rate",
+                "DT Units",
+                "DT Bill Rate",
+                "Net MSP Fee",
+                "Net Sales Tax",
+                "Net Total"
             };
+
 
             for (int col = 1; col <= headers.Length; col++)
             {
@@ -284,14 +346,30 @@ namespace KellyCashApp.Processors.Allegis
                 int row = i + 2;
                 var item = outputRows[i];
 
+
                 worksheet.Cell(row, 1).Value = item.WeekEndingDate;
                 worksheet.Cell(row, 2).Value = item.Name;
                 worksheet.Cell(row, 3).Value = item.Invoice;
                 worksheet.Cell(row, 4).Value = item.AmountDue;
                 worksheet.Cell(row, 5).Value = item.AggregateAmountPaid;
                 worksheet.Cell(row, 6).Value = item.ItemType;
-                worksheet.Cell(row, 7).Value = item.Concat;
-                worksheet.Cell(row, 8).Value = item.MetaInvoice;
+                worksheet.Cell(row, 7).Value = item.Notes;
+                worksheet.Cell(row, 8).Value = item.Concat;
+                worksheet.Cell(row, 9).Value = item.MetaInvoice;
+
+                worksheet.Cell(row, 10).Value = item.RTUnits;
+                worksheet.Cell(row, 11).Value = item.RTBillRate;
+
+                worksheet.Cell(row, 12).Value = item.OTUnits;
+                worksheet.Cell(row, 13).Value = item.OTBillRate;
+
+                worksheet.Cell(row, 14).Value = item.DTUnits;
+                worksheet.Cell(row, 15).Value = item.DTBillRate;
+
+                worksheet.Cell(row, 16).Value = item.NetMSPFee;
+                worksheet.Cell(row, 17).Value = item.NetSalesTax;
+                worksheet.Cell(row, 18).Value = item.NetTotal;
+
             }
 
             ApplyFormatting(
@@ -326,37 +404,73 @@ namespace KellyCashApp.Processors.Allegis
         // IMPORT META PAYMENT REGISTER
         // ============================================================
 
-        private static Dictionary<string, (string Name, DateTime WeekEnding)>
+
+        private static Dictionary<string, MetaRegisterMatch>
             LoadMetaRegister(string registerPath)
 
+
         {
-            var results = new Dictionary<string, (string Name, DateTime WeekEnding)>(
+            var results = new Dictionary<string, MetaRegisterMatch>(
                 StringComparer.OrdinalIgnoreCase);
 
             using var workbook = new XLWorkbook(registerPath);
 
             foreach (var sheet in workbook.Worksheets)
             {
-                // Look through the first 25 rows for the report headers.
+
                 int headerRow = -1;
                 int invoiceCol = -1;
                 int contractorCol = -1;
                 int weekEndingCol = -1;
 
+                int payCodeCol = -1;
+                int unitsCol = -1;
+                int billRateCol = -1;
+                int programFeeCol = -1;
+                int taxAmountCol = -1;
+                int netPayableCol = -1;
+
+
                 for (int row = 1; row <= 25; row++)
                 {
+
                     int inv = FindColumn(sheet, row, "Invoice Number");
                     int contractor = FindColumn(sheet, row, "Contractor");
                     int weekEnding = FindColumn(sheet, row, "Week Ending Date");
 
-                    if (inv != -1 && contractor != -1 && weekEnding != -1)
+                    int payCode = FindColumn(sheet, row, "Pay Code");
+                    int units = FindColumn(sheet, row, "Units");
+                    int billRate = FindColumn(sheet, row, "Bill Rate");
+                    int programFee = FindColumn(sheet, row, "Program Fee");
+                    int taxAmount = FindColumn(sheet, row, "Tax Amount");
+                    int netPayable = FindColumn(sheet, row, "Net Supplier Payable");
+
+                    if (inv != -1 &&
+                        contractor != -1 &&
+                        weekEnding != -1 &&
+                        payCode != -1 &&
+                        units != -1 &&
+                        billRate != -1 &&
+                        programFee != -1 &&
+                        taxAmount != -1 &&
+                        netPayable != -1)
                     {
                         headerRow = row;
+
                         invoiceCol = inv;
                         contractorCol = contractor;
                         weekEndingCol = weekEnding;
+
+                        payCodeCol = payCode;
+                        unitsCol = units;
+                        billRateCol = billRate;
+                        programFeeCol = programFee;
+                        taxAmountCol = taxAmount;
+                        netPayableCol = netPayable;
+
                         break;
                     }
+
 
                 }
 
@@ -405,22 +519,76 @@ namespace KellyCashApp.Processors.Allegis
 
                     string name = FormatName(contractor);
 
-                    var entry = (Name: name, WeekEnding: weekEnding.Date);
 
-                    if (results.TryGetValue(invoiceNumber, out var existing))
+                    string payCode = sheet.Cell(row, payCodeCol)
+                        .GetString().Trim().ToUpperInvariant();
+
+                    decimal units = GetDecimalValue(
+                        sheet.Cell(row, unitsCol));
+
+                    decimal billRate = GetDecimalValue(
+                        sheet.Cell(row, billRateCol));
+
+                    decimal programFee = GetDecimalValue(
+                        sheet.Cell(row, programFeeCol));
+
+                    decimal taxAmount = GetDecimalValue(
+                        sheet.Cell(row, taxAmountCol));
+
+                    decimal netPayable = GetDecimalValue(
+                        sheet.Cell(row, netPayableCol));
+
+                    // Create a register record the first time
+                    // we encounter this Meta invoice number.
+                    if (!results.TryGetValue(invoiceNumber, out var entry))
                     {
-                        if (!existing.Name.Equals(
-                                entry.Name, StringComparison.OrdinalIgnoreCase) ||
-                            existing.WeekEnding != entry.WeekEnding)
+                        entry = new MetaRegisterMatch
+                        {
+                            Name = name,
+                            WeekEnding = weekEnding.Date
+                        };
+
+                        results.Add(invoiceNumber, entry);
+                    }
+                    else
+                    {
+                        // All rows for the same invoice should
+                        // belong to the same contractor and week.
+                        if (!entry.Name.Equals(
+                                name, StringComparison.OrdinalIgnoreCase) ||
+                            entry.WeekEnding != weekEnding.Date)
                         {
                             throw new Exception(
                                 $"Conflicting Meta register records for invoice {invoiceNumber}.");
                         }
                     }
-                    else
+
+                    // Accumulate units and weighted bill-rate amounts
+                    // only for the pay codes we care about.
+                    switch (payCode)
                     {
-                        results.Add(invoiceNumber, entry);
+                        case "RT":
+                            entry.RTUnits += units;
+                            entry.RTBillAmount += units * billRate;
+                            break;
+
+                        case "OT":
+                            entry.OTUnits += units;
+                            entry.OTBillAmount += units * billRate;
+                            break;
+
+                        case "DT":
+                            entry.DTUnits += units;
+                            entry.DTBillAmount += units * billRate;
+                            break;
                     }
+
+                    // Always sum these amounts across ALL register
+                    // rows, regardless of their Pay Code.
+                    entry.NetMSPFee += programFee;
+                    entry.NetSalesTax += taxAmount;
+                    entry.NetTotal += netPayable;
+
                 }
             }
 
@@ -484,22 +652,47 @@ namespace KellyCashApp.Processors.Allegis
 
                 worksheet.Row(1).Height = 15;
 
-                // Currency columns.
-                worksheet.Column(4).Style.NumberFormat.Format =
-                    "$#,##0.00;($#,##0.00)";
 
-                worksheet.Column(5).Style.NumberFormat.Format =
-                    "$#,##0.00;($#,##0.00)";
+            // Currency formatting.
+            int[] currencyColumns = { 4, 5, 11, 13, 15, 16, 17, 18 };
 
-                // Column widths.
-                worksheet.Column(1).Width = 22; // Week Ending Date
-                worksheet.Column(2).Width = 24; // Name
-                worksheet.Column(3).Width = 20; // Invoice
-                worksheet.Column(4).Width = 18; // Amount Due
-                worksheet.Column(5).Width = 26; // Aggregate Amount Paid
-                worksheet.Column(6).Width = 16; // Item Type
-                worksheet.Column(7).Width = 34; // Concat
-                worksheet.Column(8).Width = 35; // Meta Invoice
+            foreach (int col in currencyColumns)
+            {
+                worksheet.Column(col).Style.NumberFormat.Format =
+                    "$#,##0.00;($#,##0.00)";
+            }
+
+            // Units formatting.
+            int[] unitColumns = { 10, 12, 14 };
+
+            foreach (int col in unitColumns)
+            {
+                worksheet.Column(col).Style.NumberFormat.Format = "0.00";
+            }
+
+
+
+            worksheet.Column(1).Width = 22;  // Week Ending Date
+            worksheet.Column(2).Width = 24;  // Name
+            worksheet.Column(3).Width = 20;  // Invoice
+            worksheet.Column(4).Width = 18;  // Amount Due
+            worksheet.Column(5).Width = 26;  // Aggregate Amount Paid
+            worksheet.Column(6).Width = 16;  // Item Type
+            worksheet.Column(7).Width = 42;  // Notes
+            worksheet.Column(8).Width = 34;  // Concat
+            worksheet.Column(9).Width = 35;  // Meta Invoice
+
+            worksheet.Column(10).Width = 14; // RT Units
+            worksheet.Column(11).Width = 18; // RT Bill Rate
+            worksheet.Column(12).Width = 14; // OT Units
+            worksheet.Column(13).Width = 18; // OT Bill Rate
+            worksheet.Column(14).Width = 14; // DT Units
+            worksheet.Column(15).Width = 18; // DT Bill Rate
+            worksheet.Column(16).Width = 18; // Net MSP Fee
+            worksheet.Column(17).Width = 18; // Net Sales Tax
+            worksheet.Column(18).Width = 20; // Net Total
+
+
 
 
 
@@ -507,6 +700,7 @@ namespace KellyCashApp.Processors.Allegis
             {
                 worksheet.Row(row).Height = 15;
 
+                // Read Item Type from column F.
                 string itemType = worksheet.Cell(row, 6)
                     .GetString()
                     .Trim();
@@ -515,18 +709,29 @@ namespace KellyCashApp.Processors.Allegis
                     "Expense",
                     StringComparison.OrdinalIgnoreCase))
                 {
-                    // Light grey background for Expense rows.
+                    // Light grey for Expense rows.
                     worksheet.Range(row, 1, row, lastColumn)
                         .Style.Fill.BackgroundColor =
                             XLColor.FromHtml("#F2F2F2");
                 }
                 else
                 {
-                    // Regular Labor rows remain white.
+                    // No shading for Labor rows.
                     worksheet.Range(row, 1, row, lastColumn)
                         .Style.Fill.BackgroundColor = XLColor.NoColor;
                 }
+
+                // Aggregate Amount Paid is column E.
+                decimal aggregatePaid =
+                    worksheet.Cell(row, 5).GetValue<decimal>();
+
+                if (aggregatePaid < 0)
+                {
+                    worksheet.Cell(row, 5)
+                        .Style.Font.FontColor = XLColor.Red;
+                }
             }
+
 
 
             range.SetAutoFilter();
@@ -703,6 +908,7 @@ namespace KellyCashApp.Processors.Allegis
             return path;
         }
 
+
         private class MetaOutputRow
         {
             public string WeekEndingDate { get; set; } = "";
@@ -711,8 +917,42 @@ namespace KellyCashApp.Processors.Allegis
             public decimal AmountDue { get; set; }
             public decimal AggregateAmountPaid { get; set; }
             public string ItemType { get; set; } = "Labor";
+            public string Notes { get; set; } = "";
             public string Concat { get; set; } = "";
             public string MetaInvoice { get; set; } = "";
+
+            public decimal RTUnits { get; set; }
+            public decimal RTBillRate { get; set; }
+
+            public decimal OTUnits { get; set; }
+            public decimal OTBillRate { get; set; }
+
+            public decimal DTUnits { get; set; }
+            public decimal DTBillRate { get; set; }
+
+            public decimal NetMSPFee { get; set; }
+            public decimal NetSalesTax { get; set; }
+            public decimal NetTotal { get; set; }
+        }
+
+
+        private class MetaRegisterMatch
+        {
+            public string Name { get; set; } = "";
+            public DateTime WeekEnding { get; set; }
+
+            public decimal RTUnits { get; set; }
+            public decimal RTBillAmount { get; set; }
+
+            public decimal OTUnits { get; set; }
+            public decimal OTBillAmount { get; set; }
+
+            public decimal DTUnits { get; set; }
+            public decimal DTBillAmount { get; set; }
+
+            public decimal NetMSPFee { get; set; }
+            public decimal NetSalesTax { get; set; }
+            public decimal NetTotal { get; set; }
         }
 
 
