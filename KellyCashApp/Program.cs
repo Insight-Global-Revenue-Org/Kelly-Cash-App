@@ -11,7 +11,6 @@ using KellyCashApp.Processors.Experis;
 using KellyCashApp.Services;
 using KellyCashApp.Workflows;
 using System.Globalization;
-using KellyCashApp.Processors.Leidos;
 
 Console.ForegroundColor = ConsoleColor.White;
 
@@ -24,7 +23,6 @@ string? importedOirStatusMessage = null;
 
 string? inputPath = null;
 int defaultMenuOption = 0;
-//test
 
 // Main application workflow loop.
 // Menu navigation, OIR imports, remittance processing (Any additional process workflows will be delegated to other C# classes)
@@ -203,24 +201,62 @@ while (true)
 
     try
     {
-        // Conditional Check for Leidos first
-        if (LeidosPayment.IsLeidosFormat(inputPath))
-        {
-            string leidosOutputPath = LeidosPayment.Process(
-                inputPath,
-                openInvoiceMatches
-            );
 
+
+        // ================================================================
+        // META CSV PAYMENT
+        // ================================================================
+
+        if (MetaPayment.IsMetaFormat(inputPath))
+        {
+            // Stop the initial processing spinner.
             loading = false;
             spinner.Wait();
 
             ClearArea(promptTop, 8);
             Console.SetCursorPosition(0, promptTop);
 
-            Console.WriteLine("Leidos payment processed successfully.");
-            Console.WriteLine($"Updated file saved to: {leidosOutputPath}");
+            // Ask for the associated Meta Payment Register.
+            string? metaRegisterPath = FileSelector.SelectFile(
+                "Paste the full file path of the Meta Payment Register (.xlsx):",
+                promptTop
+            );
+
+            // Validate the selected register.
+            if (string.IsNullOrWhiteSpace(metaRegisterPath) ||
+                !File.Exists(metaRegisterPath))
+            {
+                throw new Exception(
+                    "Meta Payment Register was not found.");
+            }
+
+            if (!Path.GetExtension(metaRegisterPath)
+                .Equals(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new Exception(
+                    "Meta Payment Register must be an .xlsx file.");
+            }
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("Processing Meta payment...");
+
+            // Process the Meta CSV using the register and imported OIR.
+            string metaOutputPath = MetaPayment.Process(
+                inputPath,
+                metaRegisterPath,
+                openInvoiceMatchesMultiple
+            );
+
+            ClearArea(promptTop, 8);
+            Console.SetCursorPosition(0, promptTop);
+
+            Console.WriteLine("Meta payment processed successfully.");
+            Console.WriteLine($"Updated file saved to: {metaOutputPath}");
             Console.WriteLine();
             Console.WriteLine("Press any key to return to the menu...");
+
             Console.ReadKey(true);
 
             defaultMenuOption = 1;
@@ -244,34 +280,6 @@ while (true)
 
             Console.WriteLine("Randstad payment processed successfully.");
             Console.WriteLine($"Updated file saved to: {randstadOutputPath}");
-            Console.WriteLine();
-            Console.WriteLine("Press any key to return to the menu...");
-            Console.ReadKey(true);
-
-            defaultMenuOption = 1;
-            continue;
-        }
-
-        // TEMP DEBUG: Treat any remaining PDF as Leidos.
-        if (Path.GetExtension(inputPath)
-            .Equals(".pdf", StringComparison.OrdinalIgnoreCase))
-        {
-            string leidosOutputPath = LeidosPayment.Process(
-                inputPath,
-                openInvoiceMatches
-            );
-
-            loading = false;
-            spinner.Wait();
-
-            ClearArea(promptTop, 8);
-            Console.SetCursorPosition(0, promptTop);
-
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("DEBUG: PDF was forced through the Leidos processor.");
-            Console.ResetColor();
-
-            Console.WriteLine($"Updated file saved to: {leidosOutputPath}");
             Console.WriteLine();
             Console.WriteLine("Press any key to return to the menu...");
             Console.ReadKey(true);
@@ -355,6 +363,17 @@ while (true)
 
             continue;
         }
+
+        string extension = Path.GetExtension(inputPath);
+
+        if (!extension.Equals(".xlsx", StringComparison.OrdinalIgnoreCase) &&
+            !extension.Equals(".xlsm", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception(
+                $"Unsupported or unrecognized payment format: {extension}");
+        }
+
+
 
         using var stream = new FileStream(inputPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
