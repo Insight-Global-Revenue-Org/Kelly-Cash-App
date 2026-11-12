@@ -99,8 +99,12 @@ namespace KellyCashApp.Processors.Allegis
                         throw new Exception(
                             $"Meta CSV row {csvRow} has missing columns.");
 
-                    string metaInvoice = fields[invoiceCol].Trim();
+
+                    string metaInvoice = NormalizeInvoiceNumber(
+                        fields[invoiceCol]);
+
                     string rawAmount = fields[amountCol].Trim();
+
 
                     if (string.IsNullOrWhiteSpace(metaInvoice))
                         throw new Exception(
@@ -354,8 +358,10 @@ namespace KellyCashApp.Processors.Allegis
 
                 for (int row = headerRow + 1; row <= lastRow; row++)
                 {
-                    string invoiceNumber =
-                        sheet.Cell(row, invoiceCol).GetString().Trim();
+
+                    string invoiceNumber = NormalizeInvoiceNumber(
+                        sheet.Cell(row, invoiceCol).GetString());
+
 
                     string contractor =
                         sheet.Cell(row, contractorCol).GetString().Trim();
@@ -484,24 +490,17 @@ namespace KellyCashApp.Processors.Allegis
                 worksheet.Column(7).Width = 34; // Concat
                 worksheet.Column(8).Width = 35; // Meta Invoice
 
-                for (int row = 2; row <= lastRow; row++)
-                {
-                    worksheet.Row(row).Height = 15;
 
-                    string name = worksheet.Cell(row, 2).GetString();
-                    string invoice = worksheet.Cell(row, 3).GetString();
+            for (int row = 2; row <= lastRow; row++)
+            {
+                worksheet.Row(row).Height = 15;
 
-                    // Highlight missing contractor or OIR matches.
-                    if (string.IsNullOrWhiteSpace(name) ||
-                        string.IsNullOrWhiteSpace(invoice))
-                    {
-                        worksheet.Range(row, 1, row, lastColumn)
-                            .Style.Fill.BackgroundColor =
-                                XLColor.FromHtml("#FFF2CC");
-                    }
-                }
+                // No background shading on payment rows.
+                worksheet.Range(row, 1, row, lastColumn)
+                    .Style.Fill.BackgroundColor = XLColor.NoColor;
+            }
 
-                range.SetAutoFilter();
+            range.SetAutoFilter();
                 worksheet.SheetView.FreezeRows(1);
             }
 
@@ -606,6 +605,57 @@ namespace KellyCashApp.Processors.Allegis
 
             return 0;
         }
+
+
+        private static string NormalizeInvoiceNumber(string raw)
+        {
+            raw = raw.Trim();
+
+            if (string.IsNullOrWhiteSpace(raw))
+                return "";
+
+            if (Regex.IsMatch(
+                raw,
+                @"^[+-]?\d+(?:\.\d+)?[Ee][+-]?\d+$"))
+            {
+                if (decimal.TryParse(
+                    raw,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out decimal scientificNumber))
+                {
+                    if (scientificNumber != decimal.Truncate(scientificNumber))
+                        throw new Exception(
+                            $"Invoice number is not a whole number: {raw}");
+
+                    return scientificNumber.ToString(
+                        "0",
+                        CultureInfo.InvariantCulture);
+                }
+
+                throw new Exception(
+                    $"Unable to parse scientific invoice number: {raw}");
+            }
+
+            // Remove a decimal suffix only if it is entirely zero.
+            if (decimal.TryParse(
+                raw,
+                NumberStyles.Number,
+                CultureInfo.InvariantCulture,
+                out decimal number))
+            {
+                if (number == decimal.Truncate(number))
+                {
+                    return number.ToString(
+                        "0",
+                        CultureInfo.InvariantCulture);
+                }
+            }
+
+            // Preserve nonnumeric invoice identifiers.
+            return raw;
+        }
+
 
         private static string GetUniqueOutputPath(string folderPath, string fileName)
         {
