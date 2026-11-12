@@ -432,7 +432,7 @@ while (true)
             defaultMenuOption = 1;
             continue;
         }
-
+ 
 
         // Conditional check for SAIC payments
         if (SAICPayment.IsSAICFormat(worksheet))
