@@ -103,6 +103,12 @@ namespace KellyCashApp.Processors.Allegis
                     string metaInvoice = NormalizeInvoiceNumber(
                         fields[invoiceCol]);
 
+
+                    string itemType = metaInvoice.Length == 11
+                        ? "Expense"
+                        : "Labor";
+
+
                     string rawAmount = fields[amountCol].Trim();
 
 
@@ -142,7 +148,7 @@ namespace KellyCashApp.Processors.Allegis
                         Invoice = "",
                         AmountDue = 0,
                         AggregateAmountPaid = paymentAmount,
-                        ItemType = "Labor",
+                        ItemType = itemType,
                         Concat = string.IsNullOrWhiteSpace(name)
                             ? ""
                             : $"{name} {weekEnding}",
@@ -158,9 +164,11 @@ namespace KellyCashApp.Processors.Allegis
             outputRows = outputRows
                 .GroupBy(x => new
                 {
+
                     Key = string.IsNullOrWhiteSpace(x.Name)
-                        ? $"UNMATCHED:{x.MetaInvoice.ToUpperInvariant()}"
-                        : $"{x.Name.ToUpperInvariant()}|{x.WeekEndingDate}"
+                    ? $"UNMATCHED:{x.MetaInvoice.ToUpperInvariant()}"
+                    : $"{x.Name.ToUpperInvariant()}|{x.WeekEndingDate}|{x.ItemType}"
+
                 })
                 .Select(group =>
                 {
@@ -176,7 +184,7 @@ namespace KellyCashApp.Processors.Allegis
                         AggregateAmountPaid =
                             group.Sum(x => x.AggregateAmountPaid),
 
-                        ItemType = "Labor",
+                        ItemType = first.ItemType,
                         Concat = first.Concat,
 
                         MetaInvoice = string.Join(", ",
@@ -333,22 +341,23 @@ namespace KellyCashApp.Processors.Allegis
                 int headerRow = -1;
                 int invoiceCol = -1;
                 int contractorCol = -1;
-                int billingCol = -1;
+                int weekEndingCol = -1;
 
                 for (int row = 1; row <= 25; row++)
                 {
                     int inv = FindColumn(sheet, row, "Invoice Number");
                     int contractor = FindColumn(sheet, row, "Contractor");
-                    int billing = FindColumn(sheet, row, "Billing Period");
+                    int weekEnding = FindColumn(sheet, row, "Week Ending Date");
 
-                    if (inv != -1 && contractor != -1 && billing != -1)
+                    if (inv != -1 && contractor != -1 && weekEnding != -1)
                     {
                         headerRow = row;
                         invoiceCol = inv;
                         contractorCol = contractor;
-                        billingCol = billing;
+                        weekEndingCol = weekEnding;
                         break;
                     }
+
                 }
 
                 if (headerRow == -1)
@@ -366,9 +375,6 @@ namespace KellyCashApp.Processors.Allegis
                     string contractor =
                         sheet.Cell(row, contractorCol).GetString().Trim();
 
-                    string billingPeriod =
-                        sheet.Cell(row, billingCol).GetString().Trim();
-
                     if (string.IsNullOrWhiteSpace(invoiceNumber))
                         continue;
 
@@ -376,21 +382,26 @@ namespace KellyCashApp.Processors.Allegis
                         throw new Exception(
                             $"Meta register row {row}: Contractor is blank.");
 
-                    Match dateMatch = Regex.Match(
-                        billingPeriod,
-                        @"-\s*(\d{1,2}/\d{1,2}/\d{4})");
+                    var weekEndingCell = sheet.Cell(row, weekEndingCol);
 
-                    if (!dateMatch.Success ||
-                        !DateTime.TryParseExact(
-                            dateMatch.Groups[1].Value,
-                            "M/d/yyyy",
-                            CultureInfo.InvariantCulture,
-                            DateTimeStyles.None,
-                            out DateTime weekEnding))
+                    DateTime weekEnding;
+
+                    if (weekEndingCell.Value.IsDateTime)
+                    {
+                        // Excel stores this as an actual date.
+                        weekEnding = weekEndingCell.GetDateTime();
+                    }
+                    else if (!DateTime.TryParseExact(
+                        weekEndingCell.GetString().Trim(),
+                        new[] { "M/d/yyyy", "MM/dd/yyyy", "M/d/yy" },
+                        CultureInfo.InvariantCulture,
+                        DateTimeStyles.None,
+                        out weekEnding))
                     {
                         throw new Exception(
-                            $"Meta register row {row}: Invalid Billing Period.");
+                            $"Meta register row {row}: Invalid Week Ending Date.");
                     }
+
 
                     string name = FormatName(contractor);
 
@@ -491,14 +502,32 @@ namespace KellyCashApp.Processors.Allegis
                 worksheet.Column(8).Width = 35; // Meta Invoice
 
 
+
             for (int row = 2; row <= lastRow; row++)
             {
                 worksheet.Row(row).Height = 15;
 
-                // No background shading on payment rows.
-                worksheet.Range(row, 1, row, lastColumn)
-                    .Style.Fill.BackgroundColor = XLColor.NoColor;
+                string itemType = worksheet.Cell(row, 6)
+                    .GetString()
+                    .Trim();
+
+                if (itemType.Equals(
+                    "Expense",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    // Light grey background for Expense rows.
+                    worksheet.Range(row, 1, row, lastColumn)
+                        .Style.Fill.BackgroundColor =
+                            XLColor.FromHtml("#F2F2F2");
+                }
+                else
+                {
+                    // Regular Labor rows remain white.
+                    worksheet.Range(row, 1, row, lastColumn)
+                        .Style.Fill.BackgroundColor = XLColor.NoColor;
+                }
             }
+
 
             range.SetAutoFilter();
                 worksheet.SheetView.FreezeRows(1);
