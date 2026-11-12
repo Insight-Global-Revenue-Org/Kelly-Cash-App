@@ -32,7 +32,7 @@ namespace KellyCashApp.Processors.Allegis
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             return headerNames.Contains("invoice_number")
-                && headerNames.Contains("invoice description")
+                && headerNames.Contains("invoice_description")
                 && headerNames.Contains("invoice_date")
                 && headerNames.Contains("payment_amount")
                 && headerNames.Contains("payment_reference_number")
