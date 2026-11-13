@@ -237,17 +237,50 @@ while (true)
                     "Meta Payment Register must be an .xlsx file.");
             }
 
+
+            // Clear the screen area after selecting the Meta register.
             ClearArea(promptTop, 8);
             Console.SetCursorPosition(0, promptTop);
 
-            Console.WriteLine("Processing Meta payment...");
+            // Start the Meta payment spinner.
+            loading = true;
 
-            // Process the Meta CSV using the register and imported OIR.
-            string metaOutputPath = MetaPayment.Process(
-                inputPath,
-                metaRegisterPath,
-                openInvoiceMatchesMultiple
-            );
+            spinner = Task.Run(() =>
+            {
+                char[] frames = { '/', '-', '\\', '|' };
+                int i = 0;
+
+                while (loading)
+                {
+                    Console.SetCursorPosition(0, promptTop);
+
+                    Console.Write(
+                        $"Processing Meta payment file... " +
+                        $"{frames[i++ % frames.Length]}   ");
+
+                    Thread.Sleep(120);
+                }
+            });
+
+            // Process the Meta CSV and payment register.
+            string metaOutputPath;
+
+            try
+            {
+                metaOutputPath = MetaPayment.Process(
+                    inputPath,
+                    metaRegisterPath,
+                    openInvoiceMatchesMultiple
+                );
+            }
+            finally
+            {
+                // Always stop the spinner when processing finishes,
+                // even if MetaPayment.Process throws an exception.
+                loading = false;
+                spinner.Wait();
+            }
+
 
             ClearArea(promptTop, 8);
             Console.SetCursorPosition(0, promptTop);
